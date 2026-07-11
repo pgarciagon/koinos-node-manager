@@ -1,0 +1,28 @@
+{
+  "name": "koinos-node-manager",
+  "version": "0.1.0-dev.0",
+  "private": true,
+  "description": "CLI-first fleet manager for Koinos nodes",
+  "type": "module",
+  "bin": {
+    "knm": "./dist/cli/main.js"
+  },
+  "files": [
+    "dist/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "cli": "tsx src/cli/main.ts",
+    "test": "tsx --test tests/**/*.test.ts"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.8.0"
+  }
+}

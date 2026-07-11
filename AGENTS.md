@@ -66,6 +66,7 @@ must use the localization system and must not create mixed-language source copy.
 - Product boundary: `docs/PRODUCT_BOUNDARY.md`
 - Active strategy: `docs/strategy/NODE_FLEET_STRATEGY.md`
 - Active implementation plan: `docs/plans/NODE_FLEET_IMPLEMENTATION_PLAN.md`
+- CLI architecture: `docs/CLI_ARCHITECTURE.md`
 - Historical source plans: `docs/archive/README.md`
 - UI explorations: `assets/ui/`
 
