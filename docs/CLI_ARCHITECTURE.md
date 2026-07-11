@@ -2,15 +2,15 @@
 
 Last updated: 2026-07-11
 
-## First Vertical
+## Executable Verticals
 
-The first executable vertical implements node listing through four independent
-layers:
+The implemented query verticals expose node listing and detail through four
+independent layers:
 
 ```text
 CLI parser and output
         |
-listNodes use case
+listNodes / getNode use cases
         |
 NodeRepository port
         |
@@ -21,6 +21,8 @@ SimulatedNodeRepository adapter
 - `src/core/node-repository.ts` defines the inventory read port.
 - `src/core/list-nodes.ts` contains filtering and ordering without UI or storage
   dependencies.
+- `src/core/get-node.ts` resolves stable node IDs and returns typed not-found
+  errors.
 - `src/adapters/simulation/` contains deterministic example nodes.
 - `src/cli/` parses arguments and renders table or JSON output.
 
@@ -41,7 +43,7 @@ node type:
 
 All addresses and identities are sanitized placeholders.
 
-## Command Contract
+## Command Contracts
 
 ```text
 knm nodes list
@@ -52,15 +54,27 @@ knm nodes list
   [--output table|json]
 ```
 
+```text
+knm nodes show <node-id>
+  [--output table|json]
+
+knm simulation scenarios
+  [--output table|json]
+
+knm --simulation <scenario> nodes list|show ...
+```
+
 The JSON response is a versioned envelope. Future schema-breaking changes must
 increment `schemaVersion`; formatting changes to the human table do not change
 that contract.
 
+Available scenarios are `default`, `empty`, `mixed-health`, and `stale-health`.
+Selection is explicit per invocation and does not alter persistent state.
+
 ## Next Steps
 
-1. Add a node-detail query and `knm nodes show <id>`.
-2. Define typed CLI error envelopes for JSON output.
-3. Add a persisted local inventory adapter.
-4. Add simulation scenarios for empty, large, stale, conflicting, and unsafe
-   inventories.
-5. Expose the same list use case through an Electron-main typed bridge.
+1. Add build identity and resource-specific help.
+2. Add a persisted local inventory adapter.
+3. Add large, conflicting, unsafe, and interrupted simulation scenarios.
+4. Implement inventory `add`, `update`, and inventory-only `remove` use cases.
+5. Expose the same query use cases through an Electron-main typed bridge.

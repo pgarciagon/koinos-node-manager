@@ -1,90 +1,68 @@
 #!/usr/bin/env node
 
-import { parseArgs } from 'node:util'
-import { SimulatedNodeRepository } from '../adapters/simulation/simulated-node-repository.js'
-import { listNodes, type ListNodesQuery } from '../core/list-nodes.js'
-import {
-  NODE_FUNCTIONS,
-  type ManagementClass,
-  type NetworkName,
-  type NodeFunction,
-  type NodeHealth
-} from '../domain/node.js'
-import { formatNodesJson, formatNodesTable, type OutputFormat } from './output.js'
+import { createApplicationContext } from './application-context.js'
+import { runNodesCommand } from './commands/nodes.js'
+import { runSimulationCommand } from './commands/simulation.js'
+import { errorEnvelope, exitCodeFor, toStructuredError } from './envelope.js'
 
-const managementClasses: readonly ManagementClass[] = ['managed', 'connected', 'external', 'discovered']
-const networks: readonly NetworkName[] = ['mainnet', 'testnet', 'custom', 'unknown']
-const healthStates: readonly NodeHealth[] = ['healthy', 'degraded', 'unreachable', 'unknown']
+type GlobalArguments = {
+  args: readonly string[]
+  simulationScenario: string
+  outputJsonRequested: boolean
+}
 
 function help(): string {
   return `Koinos Node Manager CLI
 
 Usage:
-  knm nodes list [options]
+  knm [--simulation <scenario>] nodes list [options]
+  knm [--simulation <scenario>] nodes show <node-id> [options]
+  knm simulation scenarios [--output table|json]
 
-Options:
-  --management <value>  managed | connected | external | discovered
-  --network <value>     mainnet | testnet | custom | unknown
-  --function <value>    observer | producer | seed | api | backup-source
-  --health <value>      healthy | degraded | unreachable | unknown
-  --output <value>      table | json (default: table)
+Global options:
+  --simulation <value>  Select an explicit deterministic simulation scenario
   --help                Show this help
 
-The first version uses a deterministic simulation repository.`
+Run "knm simulation scenarios" to inspect available scenarios.`
 }
 
-function oneOf<T extends string>(name: string, value: string | undefined, values: readonly T[]): T | undefined {
-  if (value === undefined) return undefined
-  if ((values as readonly string[]).includes(value)) return value as T
-  throw new Error(`Invalid --${name} value "${value}". Expected one of: ${values.join(', ')}.`)
+function parseGlobalArguments(argv: readonly string[]): GlobalArguments {
+  const args = [...argv]
+  let simulationScenario = 'default'
+  if (args[0] === '--simulation') {
+    const value = args[1]
+    if (value === undefined) throw new Error('The --simulation option requires a scenario name.')
+    simulationScenario = value
+    args.splice(0, 2)
+  }
+  return {
+    args,
+    simulationScenario,
+    outputJsonRequested: args.includes('--output') && args[args.indexOf('--output') + 1] === 'json'
+  }
 }
 
-async function main(argv: readonly string[]): Promise<number> {
-  if (argv.includes('--help') || argv.length === 0) {
-    console.log(help())
-    return 0
+export async function runCli(argv: readonly string[]): Promise<{ code: number; stdout?: string; stderr?: string }> {
+  let global: GlobalArguments | undefined
+  let commandName = 'unknown'
+  try {
+    global = parseGlobalArguments(argv)
+    if (global.args.includes('--help') || global.args.length === 0) return { code: 0, stdout: help() }
+    const [group, command, ...args] = global.args
+    commandName = `${group ?? 'unknown'}.${command ?? 'unknown'}`
+    if (group === 'simulation') return { code: 0, stdout: await runSimulationCommand(command, args) }
+    const context = createApplicationContext(global.simulationScenario)
+    if (group === 'nodes') return { code: 0, stdout: await runNodesCommand(command, args, context) }
+    throw new Error(`Unknown command "${global.args.join(' ')}". Run "knm --help" for usage.`)
+  } catch (error: unknown) {
+    const json = global?.outputJsonRequested ?? argv.includes('json')
+    if (json) return { code: exitCodeFor(error), stderr: errorEnvelope(commandName, error) }
+    const structured = toStructuredError(error)
+    return { code: exitCodeFor(error), stderr: `Error [${structured.code}]: ${structured.message}\nNext action: ${structured.nextAction}` }
   }
-
-  const [group, command, ...optionArgs] = argv
-  if (group !== 'nodes' || command !== 'list') {
-    throw new Error(`Unknown command "${argv.join(' ')}". Run "knm --help" for usage.`)
-  }
-
-  const parsed = parseArgs({
-    args: optionArgs,
-    options: {
-      management: { type: 'string' },
-      network: { type: 'string' },
-      function: { type: 'string' },
-      health: { type: 'string' },
-      output: { type: 'string', default: 'table' }
-    },
-    allowPositionals: false,
-    strict: true
-  })
-
-  const query: ListNodesQuery = {}
-  const management = oneOf('management', parsed.values.management, managementClasses)
-  const network = oneOf('network', parsed.values.network, networks)
-  const nodeFunction = oneOf('function', parsed.values.function, NODE_FUNCTIONS)
-  const health = oneOf('health', parsed.values.health, healthStates)
-  if (management !== undefined) query.management = management
-  if (network !== undefined) query.network = network
-  if (nodeFunction !== undefined) query.function = nodeFunction
-  if (health !== undefined) query.health = health
-  const output = oneOf('output', parsed.values.output, ['table', 'json'] as const) as OutputFormat
-  const repository = new SimulatedNodeRepository()
-  const result = await listNodes(repository, query)
-
-  console.log(output === 'json' ? formatNodesJson(result, query) : formatNodesTable(result))
-  return 0
 }
 
-main(process.argv.slice(2)).then(
-  (code) => { process.exitCode = code },
-  (error: unknown) => {
-    const message = error instanceof Error ? error.message : 'Unknown CLI error.'
-    console.error(`Error: ${message}`)
-    process.exitCode = 2
-  }
-)
+const result = await runCli(process.argv.slice(2))
+if (result.stdout !== undefined) console.log(result.stdout)
+if (result.stderr !== undefined) console.error(result.stderr)
+process.exitCode = result.code

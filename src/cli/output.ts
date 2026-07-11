@@ -1,5 +1,6 @@
 import type { ListNodesQuery, ListNodesResult } from '../core/list-nodes.js'
 import type { NodeFunction, NodeRecord } from '../domain/node.js'
+import { successEnvelope } from './envelope.js'
 
 export type OutputFormat = 'table' | 'json'
 
@@ -44,16 +45,40 @@ export function formatNodesTable(result: ListNodesResult): string {
 }
 
 export function formatNodesJson(result: ListNodesResult, query: ListNodesQuery): string {
-  return JSON.stringify({
-    schemaVersion: 1,
-    ok: true,
-    command: 'nodes.list',
-    query,
-    data: {
-      total: result.total,
-      nodes: result.nodes
-    },
-    warnings: [],
-    errors: []
-  }, null, 2)
+  return successEnvelope('nodes.list', { total: result.total, nodes: result.nodes }, { query })
+}
+
+function label(value: string): string {
+  return value.replaceAll('-', ' ')
+}
+
+export function formatNodeDetail(node: NodeRecord): string {
+  const authority = Object.entries(node.management.authority)
+    .filter(([, enabled]) => enabled)
+    .map(([name]) => name)
+    .join(', ') || 'none'
+  const endpoints = node.endpoints.length === 0
+    ? 'none'
+    : node.endpoints.map((endpoint) => `${endpoint.kind} (${endpoint.scope}, ${endpoint.verification}): ${endpoint.address}`).join('\n  ')
+
+  return [
+    `${node.displayName} (${node.id})`,
+    '',
+    `Management:   ${node.management.class} / ${node.management.origin} / ${node.management.authorityLevel}`,
+    `Authority:    ${authority}`,
+    `Flavor:       ${node.flavor.id}${node.flavor.version === undefined ? '' : ` ${node.flavor.version}`} (${node.flavor.confidence})`,
+    `Network:      ${node.network.name} (${node.network.verification})`,
+    `Location:     ${node.location.kind} / ${node.location.environment}`,
+    `Functions:    ${activeFunctions(node) || 'none known'}`,
+    `Health:       ${node.health}`,
+    `Last seen:    ${node.lastObservedAt ?? 'unknown'}`,
+    `Provenance:   ${label(node.provenance.source)}`,
+    '',
+    'Endpoints:',
+    `  ${endpoints}`
+  ].join('\n')
+}
+
+export function formatNodeJson(node: NodeRecord): string {
+  return successEnvelope('nodes.show', { node })
 }

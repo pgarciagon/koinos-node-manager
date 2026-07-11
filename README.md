@@ -39,6 +39,9 @@ Filter the simulated inventory:
 npm run cli -- nodes list --management managed
 npm run cli -- nodes list --network mainnet --function seed
 npm run cli -- nodes list --health degraded
+npm run cli -- nodes show node-nas-observer
+npm run cli -- simulation scenarios
+npm run cli -- --simulation empty nodes list
 ```
 
 Request the versioned structured envelope:
@@ -57,12 +60,15 @@ node dist/cli/main.js nodes list
 The CLI calls the shared `listNodes` use case through a `NodeRepository` port.
 The current `SimulatedNodeRepository` is an adapter and can later be replaced
 by persisted inventory without changing the command or Electron integration.
+`nodes show` uses the same repository port and returns a typed `NODE_NOT_FOUND`
+error with exit code `3` when the stable ID does not exist.
 
 ## Documentation
 
 - [Product and architecture boundary](docs/PRODUCT_BOUNDARY.md)
 - [Node Fleet strategy](docs/strategy/NODE_FLEET_STRATEGY.md)
 - [Implementation plan](docs/plans/NODE_FLEET_IMPLEMENTATION_PLAN.md)
+- [CLI implementation plan](docs/plans/CLI_IMPLEMENTATION_PLAN.md)
 - [Archived source plans](docs/archive/README.md)
 - [UI explorations](assets/ui/)
 
