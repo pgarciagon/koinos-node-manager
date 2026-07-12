@@ -1,17 +1,28 @@
 import type {
+  AuthorityLevel,
+  LocationKind,
   ManagementClass,
   NetworkName,
+  NodeFlavorId,
   NodeFunction,
   NodeHealth,
-  NodeRecord
+  NodeOrigin,
+  NodeRecord,
+  ObservationFreshness
 } from '../domain/node.js'
 import type { NodeRepository } from './node-repository.js'
+import { resolveNodeView } from './node-view.js'
 
 export type ListNodesQuery = {
   management?: ManagementClass
+  origin?: NodeOrigin
+  flavor?: NodeFlavorId
   network?: NetworkName
+  location?: LocationKind
+  authority?: AuthorityLevel
   function?: NodeFunction
   health?: NodeHealth
+  staleness?: ObservationFreshness
 }
 
 export type ListNodesResult = {
@@ -24,11 +35,21 @@ export async function listNodes(
   query: ListNodesQuery = {}
 ): Promise<ListNodesResult> {
   const nodes = (await repository.list())
-    .filter((node) => query.management === undefined || node.management.class === query.management)
-    .filter((node) => query.network === undefined || node.network.name === query.network)
-    .filter((node) => query.function === undefined || node.functions[query.function] !== 'disabled' && node.functions[query.function] !== 'unknown')
-    .filter((node) => query.health === undefined || node.health === query.health)
+    .filter((node) => matchesQuery(node, query))
     .sort((left, right) => left.displayName.localeCompare(right.displayName))
 
   return { nodes, total: nodes.length }
+}
+
+function matchesQuery(node: NodeRecord, query: ListNodesQuery): boolean {
+  const resolved = resolveNodeView(node)
+  return (query.management === undefined || node.management.class === query.management)
+    && (query.origin === undefined || node.management.origin === query.origin)
+    && (query.flavor === undefined || resolved.flavor.id === query.flavor)
+    && (query.network === undefined || resolved.network.name === query.network)
+    && (query.location === undefined || resolved.location.kind === query.location)
+    && (query.authority === undefined || node.management.authorityLevel === query.authority)
+    && (query.function === undefined || resolved.functions[query.function] === 'enabled')
+    && (query.health === undefined || resolved.health === query.health)
+    && (query.staleness === undefined || resolved.freshness === query.staleness)
 }

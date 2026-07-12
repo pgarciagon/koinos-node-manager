@@ -12,10 +12,13 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "check": "tsc -p tsconfig.json --noEmit",
-    "cli": "tsx src/cli/main.ts",
-    "test": "tsx --test tests/**/*.test.ts"
+    "build:identity": "node scripts/generate-build-identity.mjs",
+    "build": "npm run --silent build:identity && tsc -p tsconfig.json",
+    "check": "npm run --silent build:identity && tsc -p tsconfig.json --noEmit",
+    "cli": "npm run --silent build:identity && tsx src/cli/main.ts",
+    "test": "npm run --silent build:identity && tsx --test tests/**/*.test.ts",
+    "test:compiled": "npm run --silent build && node scripts/test-compiled-cli.mjs",
+    "verify": "npm run check && npm test && npm run test:compiled"
   },
   "engines": {
     "node": ">=22"

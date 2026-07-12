@@ -67,6 +67,8 @@ must use the localization system and must not create mixed-language source copy.
 - Active strategy: `docs/strategy/NODE_FLEET_STRATEGY.md`
 - Active implementation plan: `docs/plans/NODE_FLEET_IMPLEMENTATION_PLAN.md`
 - CLI implementation plan: `docs/plans/CLI_IMPLEMENTATION_PLAN.md`
+- Interactive CLI plan: `docs/plans/INTERACTIVE_CLI_IMPLEMENTATION_PLAN.md`
+- CLI Phase 3 plan: `docs/plans/CLI_PHASE_3_IMPLEMENTATION_PLAN.md`
 - CLI architecture: `docs/CLI_ARCHITECTURE.md`
 - Historical source plans: `docs/archive/README.md`
 - UI explorations: `assets/ui/`

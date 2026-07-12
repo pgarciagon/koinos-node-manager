@@ -1,8 +1,10 @@
+import type { ApplicationExitCode } from './exit-codes.js'
+
 export type ErrorSeverity = 'warning' | 'error' | 'unsafe'
 
 export type ApplicationErrorDetails = {
   code: string
-  exitCode: number
+  exitCode: ApplicationExitCode
   severity: ErrorSeverity
   retryable: boolean
   message: string
@@ -11,7 +13,7 @@ export type ApplicationErrorDetails = {
 
 export class ApplicationError extends Error {
   readonly code: string
-  readonly exitCode: number
+  readonly exitCode: ApplicationExitCode
   readonly severity: ErrorSeverity
   readonly retryable: boolean
   readonly nextAction: string

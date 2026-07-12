@@ -1,4 +1,5 @@
 import { ApplicationError } from '../core/application-error.js'
+import { EXIT_CODES } from '../core/exit-codes.js'
 
 export type StructuredError = {
   code: string
@@ -8,9 +9,11 @@ export type StructuredError = {
   nextAction: string
 }
 
+export const ENVELOPE_SCHEMA_VERSION = 2
+
 export function successEnvelope(command: string, data: unknown, context: Record<string, unknown> = {}): string {
   return JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: ENVELOPE_SCHEMA_VERSION,
     ok: true,
     command,
     ...context,
@@ -23,7 +26,7 @@ export function successEnvelope(command: string, data: unknown, context: Record<
 export function errorEnvelope(command: string, error: unknown): string {
   const structured = toStructuredError(error)
   return JSON.stringify({
-    schemaVersion: 1,
+    schemaVersion: ENVELOPE_SCHEMA_VERSION,
     ok: false,
     command,
     data: null,
@@ -53,5 +56,5 @@ export function toStructuredError(error: unknown): StructuredError {
 }
 
 export function exitCodeFor(error: unknown): number {
-  return error instanceof ApplicationError ? error.exitCode : 2
+  return error instanceof ApplicationError ? error.exitCode : EXIT_CODES.invalidInput
 }

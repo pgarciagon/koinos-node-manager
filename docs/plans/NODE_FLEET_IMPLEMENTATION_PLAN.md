@@ -1,9 +1,12 @@
 # Node Fleet Implementation Plan
 
-- Status: planned; implementation and validation remain phase-specific
-- Last updated: 2026-07-10
+- Status: active; the functional core and inventory foundation are being
+  delivered CLI-first through `CLI_IMPLEMENTATION_PLAN.md`
+- Last updated: 2026-07-12
 - Initial repository: `pgarciagon/koinos-node-manager`
 - Strategy source: `NODE_FLEET_STRATEGY.md`
+- Delivery vehicle: the `knm` CLI proves each capability first; Electron is a
+  peer adapter over the same use cases, not the first consumer
 - Native runtime owner: `koinos/teleno`; integration must use released,
   versioned artifacts and contracts
 
@@ -56,7 +59,33 @@ Excluded from the committed roadmap:
 
 ## 3. Current Baseline
 
-This plan starts from working components currently located in Koinos One and
+### 3.1 Baseline in this repository
+
+This repository already contains an implemented, tested foundation delivered
+through CLI Phases 0–2 (see `CLI_IMPLEMENTATION_PLAN.md`):
+
+- `src/domain/node.ts`: a compositional node model with management class,
+  origin, authority, flavor, network, location, functions, endpoints,
+  identity evidence, and separated declared, desired, observed, and verified
+  state plus provenance;
+- `src/core/`: pure use cases for listing, detail, inventory-only mutation,
+  validation (stable IDs, opaque references, sensitive-field rejection,
+  duplicate IDs), effective factual-state resolution, and output
+  sanitization, with no CLI, Electron, filesystem, or network dependency;
+- `src/adapters/filesystem/`: a versioned (schema `1`), revision-checked,
+  atomically written, writer-locked, permission-restricted inventory with
+  bounded backups, sanitized corruption quarantine, an idempotent schema `0`
+  migration, and explicit backup recovery;
+- `src/adapters/simulation/`: deterministic sanitized fleet fixtures;
+- `src/cli/`: batch and interactive adapters over one shared command executor
+  with typed errors, a stable exit-code contract, and schema v2 envelopes.
+
+New fleet capabilities in this plan build on that foundation; they must not
+introduce a second node model or a second inventory store.
+
+### 3.2 Components remaining in Koinos One
+
+This plan also draws on working components currently located in Koinos One and
 scheduled for deliberate extraction:
 
 - `src/app/remote-nodes.ts`: inventory types, normalization, notices,
@@ -122,6 +151,26 @@ Desired and observed state stay separate. IDs remain stable across display-name
 or host changes. Migrations are pure, sequential, idempotent, fixture-tested,
 previewed before persistence, and keep a rollback copy.
 
+**Mapping to the implemented model.** The sketch above predates the
+implemented `NodeRecord` in `src/domain/node.ts`, which is the binding shape
+going forward. Already covered: stable IDs, display names, flavor, network,
+location with opaque `connectionRef`, per-function role state, declared vs
+desired vs observed vs verified separation (stronger than the sketch's single
+desired/observed split), health with explicit freshness, provenance, and
+management/authority classification, which the sketch lacked entirely.
+Not yet modeled and still owed by this plan: `supervisor`, `instance`
+(basedir reference, ports, log reference), `artifact` identity,
+`backupPolicy`, `producerProfileRef`, fleet-level `policies`, and
+`trustEvidence` as a distinct field. These arrive as additive schema
+migrations to the existing inventory, not as a parallel `FleetNode` type.
+The implemented inventory is schema `1` with a monotonic revision, so the
+"v1 to v2" migration language elsewhere in this plan refers to Koinos One's
+remote-node records; this repository's own inventory evolves by incrementing
+its schema version. One known delta: the implemented schema `0` migration is
+automatic with a rollback backup but has no preview step; the
+preview-before-persistence requirement stands for future migrations that can
+lose or reinterpret data.
+
 ### Runtime capabilities
 
 Adapters declare support for install, configure, start/stop/restart, health,
@@ -159,12 +208,18 @@ idempotency or observed state proves retry is safe.
 
 ## 6. Module Boundaries
 
-Create a pure fleet domain layer for schemas, migrations, conflicts,
-capabilities, plans, rollout reducers, health policy, and sanitized display
-models. It must have no React, Electron, filesystem, SSH, subprocess, or network
-dependency.
+The pure fleet domain layer already exists and lives in `src/domain/` and
+`src/core/` of this repository. It holds schemas, validation, conflicts
+(currently duplicate IDs), factual-state policy, and sanitized display models,
+and has no React, Electron, filesystem, SSH, subprocess, or network
+dependency. Capabilities, lifecycle plans, rollout reducers, and health policy
+extend this same layer; do not start a second one.
 
-Create focused Electron services:
+Adapters attach in this order: the CLI command executor is the first consumer
+(already implemented for inventory), and Electron services are added later as
+peers over the identical use cases. Create focused services (initially plain
+application services callable from the CLI, hosted in Electron main once the
+desktop adapter exists):
 
 - inventory: atomic storage, migrations, and revision checks;
 - planning: adapter selection and immutable plans;
@@ -188,18 +243,30 @@ digest, revision, and confirmation again and sanitizes all responses/events.
 
 ### A. Inventory migration and fleet view
 
-1. Freeze valid, malformed, and edge-case v1 fixtures.
-2. Implement v2 schema, migration preview, atomic write, rollback copy, and
-   bounded history.
-3. Add flavor, location, supervisor, artifact, instance, desired/observed role,
-   and opaque references.
-4. Detect duplicate IDs, basedirs, ports, services, and producer identities
-   across the whole fleet.
-5. Preserve current remote workflows through a compatibility façade.
-6. Add filters and fleet summaries without hiding degraded/unsafe nodes.
+1. Freeze valid, malformed, and edge-case fixtures for every supported input:
+   this repository's schema `0`/`1` files (done for schema `0`) and, at
+   extraction time, Koinos One remote-node records.
+2. Implement versioned schema, atomic write, rollback copy, and bounded
+   history — **delivered** by the filesystem inventory adapter (atomic rename,
+   writer lock, revision checks, ten-entry backups, quarantine). Migration
+   preview remains **pending**; the current schema `0` migration is automatic
+   with a backup.
+3. Add flavor, location, desired/observed role, and opaque references —
+   **delivered** in `NodeRecord`. Supervisor, artifact, and instance fields
+   remain **pending** additive migrations.
+4. Detect duplicates across the whole fleet: duplicate IDs are **delivered**;
+   basedirs, ports, services, and producer identities are **pending** with the
+   fields that carry them.
+5. Import Koinos One remote-node records through an explicit migration path
+   when extraction happens; this repository has no existing users, so a
+   runtime compatibility façade is unnecessary here and only Koinos One needs
+   one during its own transition.
+6. Add filters and fleet summaries without hiding degraded/unsafe nodes —
+   filters **delivered** in `nodes list`; fleet-level summaries **pending**.
 
 Exit: valid records migrate without losing trust evidence; ambiguous records
-are quarantined rather than guessed; rollback works before node mutation.
+are quarantined rather than guessed (quarantine behavior already implemented
+for corrupt inventories); rollback works before node mutation.
 
 ### B. Runtime and artifact foundation
 
@@ -388,6 +455,15 @@ catch-up/peer/disk/log/backup observation, and state-preserving rollback proof.
 
 ## 10. Delivery Phases And PR Sequence
 
+These phases now interleave with the CLI plan, which is the active delivery
+track. CLI Phases 0–2 (dispatcher, node model, queries, interactive shell,
+persisted inventory) have delivered the domain, storage, and adapter
+substrate that fleet Phase 1 assumed would be built from scratch; fleet
+Phases 2 onward consume CLI Phase 3+ capabilities (connections, discovery,
+adoption, real health, durable plans) as they land. Where the two plans
+overlap, the CLI plan governs sequencing and this plan governs fleet
+semantics and safety.
+
 ### Phase 0 — Baseline and decisions
 
 1. Current implementation/strategy gap matrix.
@@ -398,14 +474,22 @@ catch-up/peer/disk/log/backup observation, and state-preserving rollback proof.
 
 Exit: decisions and validation matrix approved before broad refactoring.
 
-### Phase 1 — Fleet domain and compatibility
+### Phase 1 — Fleet domain and compatibility (largely delivered CLI-first)
 
-1. Schemas, migrations, fixtures, validation.
-2. Revisioned atomic storage.
-3. Compatibility façade for current remote workflows.
-4. Read-only fleet list/detail, localization, docs, packaged regression.
+1. Schemas, migrations, fixtures, validation — delivered (`src/domain`,
+   `src/core/validate-node.ts`, schema `0` migration fixtures).
+2. Revisioned atomic storage — delivered
+   (`src/adapters/filesystem/file-system-inventory-repository.ts`).
+3. Koinos One remote-workflow compatibility — deferred to the extraction
+   effort in Koinos One itself; not applicable inside this repository.
+4. Read-only fleet list/detail — delivered through `knm nodes list/show`.
+   Localization and the packaged desktop regression remain owed by the
+   Electron adapter; the CLI is currently English-only, which is an accepted
+   interim state to be revisited before any desktop release.
 
-Exit: existing users migrate without losing remote functionality.
+Exit: existing users migrate without losing remote functionality (holds
+trivially today — there are no existing users of this repository; the exit
+re-applies when Koinos One records are imported).
 
 ### Phase 2 — Runtime adapter and local instances
 
@@ -497,12 +581,73 @@ Fogata/provider/EVM explorations are not part of this definition.
 
 ## 13. Immediate Next Actions
 
-1. Produce the Phase 0 gap matrix with file and test evidence.
-2. Add and approve the ADR referenced by the strategy.
-3. Decide runtime packaging and CLI ownership.
-4. Freeze inventory v1 fixtures and design v2 migration.
-5. Define lifecycle plan, execution, receipt, and health schemas.
-6. Prepare disposable local/remote testnet validation targets.
-7. Implement Phase 1 through compatibility-preserving PRs.
-8. Re-estimate later phases from measured Phase 2 cost rather than speculative
-   calendar dates.
+1. Produce the Phase 0 gap matrix with file and test evidence — still open;
+   the CLI plan's per-phase validation records cover this repository, but the
+   Koinos One extraction inventory has not been produced.
+2. Add and approve the ADR referenced by the strategy — still open.
+3. Decide runtime packaging and CLI ownership — decided: this repository owns
+   the `knm` CLI and the shared functional core; Electron consumes the same
+   use cases later.
+4. Freeze inventory fixtures and design migrations — done for this
+   repository's schema `0`/`1`; still open for Koinos One record import.
+5. Define lifecycle plan, execution, receipt, and health schemas — still
+   open; scheduled against CLI Phases 4–5.
+6. Prepare disposable local/remote testnet validation targets — still open;
+   needed from CLI Phase 3 onward.
+7. Deliver connections, discovery, and adoption (CLI Phase 3) as the next
+   implementation slice feeding fleet Phase 2.
+8. Re-estimate later phases from measured cost of the delivered CLI phases
+   rather than speculative calendar dates.
+
+## 14. Amendment Summary — 2026-07-12
+
+This plan was reconciled against the implemented code on
+`codex/cli-list-nodes` and against `CLI_IMPLEMENTATION_PLAN.md`. Amendments:
+
+1. **Header.** Status moved from "planned" to "active", and the CLI was
+   recorded as the delivery vehicle, with Electron as a later peer adapter.
+   The original text implicitly assumed Electron-first delivery, which
+   contradicted the CLI plan's governing principle.
+2. **Current baseline (3).** Split into two subsections: the implemented
+   baseline in this repository (domain model, pure core, versioned atomic
+   filesystem inventory, simulation fixtures, batch/interactive CLI) and the
+   Koinos One components still awaiting extraction. Previously the plan
+   claimed the only baseline was Koinos One code, which is no longer true.
+3. **Target domain model (5).** Added an explicit mapping from the `FleetNode`
+   sketch to the implemented `NodeRecord`: what is already covered
+   (management/authority, four-layer state, freshness, provenance, opaque
+   references), what remains pending (supervisor, instance, artifact, backup
+   policy, producer profile, fleet policies, trust evidence), and the rule
+   that pending fields arrive as additive migrations to the existing schema
+   rather than a parallel type. Clarified that "v1 to v2" migration language
+   refers to Koinos One records, since this repository's inventory is already
+   schema `1`. Recorded one delta against the plan's own requirement: the
+   implemented schema `0` migration is automatic-with-backup and has no
+   preview step; preview remains required for future lossy migrations.
+4. **Module boundaries (6).** Recorded that the pure fleet domain layer
+   already exists in `src/domain` and `src/core` and must be extended, not
+   duplicated, and that services attach CLI-first before being hosted in
+   Electron main.
+5. **Workstream A (7.A).** Annotated each item as delivered or pending
+   against the code: atomic revisioned storage, quarantine, duplicate-ID
+   detection, and list filters are delivered; migration preview,
+   supervisor/artifact/instance fields, basedir/port/service/producer-identity
+   conflict detection, and fleet summaries are pending. Replaced the
+   compatibility-façade item with an explicit Koinos One import path, since
+   this repository has no pre-existing users to shield.
+6. **Delivery phases (10).** Added the interleaving rule (CLI plan governs
+   sequencing, this plan governs fleet semantics and safety) and marked fleet
+   Phase 1 as largely delivered CLI-first, with localization and packaged
+   desktop regression explicitly still owed by the Electron adapter.
+7. **Immediate next actions (13).** Updated per-item status: CLI ownership is
+   decided, this repository's fixtures and migrations exist, and the next
+   slice is CLI Phase 3 (connections, discovery, adoption) feeding fleet
+   Phase 2.
+
+Unchanged on purpose: the three architecture axes (flavor, location,
+supervisor), all twelve safety invariants, the lifecycle plan and durable
+execution contracts, the health model, the canary/rollout policy, the
+producer and mainnet gating, and the test matrix. Nothing in the implemented
+code contradicts them; sanitization (invariant 9) and observer-safe defaults
+(invariant 1) are already enforced by `src/core/sanitize-node.ts` and
+`src/core/node-inventory.ts` respectively.
