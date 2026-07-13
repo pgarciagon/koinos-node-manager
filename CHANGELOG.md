@@ -87,6 +87,9 @@ All notable changes to Koinos Node Manager will be documented in this file.
 - Separately approved live legacy-multiservice validation with identical
   pre/post configuration and component evidence, batch/interactive parity, and
   no persisted inspection state or runtime mutation.
+- Additional approved legacy seed-node validation proving that a deployed and
+  running block-producer service is not reported as configured or effective
+  production without independent producer-address evidence.
 
 ### Changed
 

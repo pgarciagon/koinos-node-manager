@@ -101,10 +101,10 @@ describe('LegacyMultiserviceInspectionAdapter', () => {
     assert.equal(snapshot.resources.storage.availability, 'unavailable')
   })
 
-  it('keeps configured, effective, and address-presence producer evidence independent', async () => {
+  it('does not infer configured or effective production from a deployed producer service alone', async () => {
     const payloads = completeInspectionPayloads({
       'node.multiservice.components': componentPayload([{
-        service: 'block_producer', status: 'exited', restartCount: 2,
+        service: 'block_producer', status: 'running', restartCount: 2,
         image: 'koinos/koinos-block-producer:v2.6.0', imageId: `sha256:${'c'.repeat(64)}`,
         startedAt: '2026-07-13T09:00:15.000Z', ports: {}
       }]),
@@ -117,7 +117,7 @@ describe('LegacyMultiserviceInspectionAdapter', () => {
     const snapshot = await new LegacyMultiserviceInspectionAdapter().inspect(request(
       new FakeProbeTransport({ outcome: 'success', payloads })
     ))
-    assert.equal(snapshot.producer.configured.availability === 'available' && snapshot.producer.configured.value, true)
+    assert.equal(snapshot.producer.configured.availability === 'available' && snapshot.producer.configured.value, false)
     assert.equal(snapshot.producer.effectiveEnabled.availability === 'available' && snapshot.producer.effectiveEnabled.value, false)
     assert.equal(snapshot.producer.addressPresent.availability === 'available' && snapshot.producer.addressPresent.value, false)
   })

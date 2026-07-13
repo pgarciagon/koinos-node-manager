@@ -232,7 +232,7 @@ function buildSnapshot(
   const chain = chainValues(request, parsed, responses, requested, headEvidence, rpcEvidence, headDerivedEvidence, derivedEvidence)
   const configuration = configurationValue(parsed, responses, requested, configEvidence, derivedEvidence)
   const apis = apiValue(parsed, responses, requested, dockerEvidence, derivedEvidence)
-  const producer = producerValues(parsed, components, configuration, requested, configEvidence, dockerEvidence, derivedEvidence)
+  const producer = producerValues(parsed, components, configuration, requested, configEvidence, derivedEvidence)
   const governance = governanceValues(configuration, requested, configEvidence, derivedEvidence)
   const resources = resourceValues(parsed, responses, requested, configEvidence, derivedEvidence)
   const overview = overviewValues(request, parsed, components, chain, configuration, requested, dockerEvidence, rpcEvidence, derivedEvidence)
@@ -425,7 +425,6 @@ function producerValues(
   configuration: InspectionValue<SafeConfiguration>,
   requested: ReadonlySet<InspectionSection>,
   configEvidence: ReturnType<typeof inspectionEvidence>,
-  dockerEvidence: ReturnType<typeof inspectionEvidence>,
   derivedEvidence: ReturnType<typeof inspectionEvidence>
 ): InspectionProducer {
   if (!requested.has('overview')) {
@@ -440,12 +439,16 @@ function producerValues(
   const blockProducers = components.availability === 'available'
     ? components.value.filter((component) => component.name === 'block_producer' || component.name === 'block_producer-secondary')
     : []
-  const configured = components.availability === 'available'
-    ? available(blockProducers.some((component) => component.available.availability === 'available' && component.available.value), dockerEvidence)
-    : unavailable<boolean>(components.reason, dockerEvidence)
-  const effectiveEnabled = components.availability === 'available'
-    ? available(blockProducers.some((component) => component.state.availability === 'available' && component.state.value === 'running'), dockerEvidence)
-    : unavailable<boolean>(components.reason, dockerEvidence)
+  const configured = configuration.availability === 'available'
+    ? available(configuration.value.producerAddressPresent, configEvidence)
+    : unavailable<boolean>(configuration.reason, configEvidence)
+  const effectiveEnabled = configured.availability !== 'available'
+    ? unavailable<boolean>(configured.reason, derivedEvidence)
+    : !configured.value
+      ? available(false, derivedEvidence)
+      : components.availability === 'available'
+        ? available(blockProducers.some((component) => component.state.availability === 'available' && component.state.value === 'running'), derivedEvidence)
+        : unavailable<boolean>(components.reason, derivedEvidence)
   const productionPercentage = parsed.configuration?.productionPercentage === undefined
     ? unavailable<number>('not-configured', configEvidence)
     : available(parsed.configuration.productionPercentage, configEvidence)

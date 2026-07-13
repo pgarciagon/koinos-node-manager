@@ -53,7 +53,7 @@ surface was invoked.
 | Components | The fixed known Koinos service catalog, including a normalized secondary producer component, explicit availability, typed running state, restart count, sanitized version/digest, and uptime where Docker exposes a valid start time. Missing components remain `not-configured`. |
 | Chain | Head height/ID, last irreversible block, head age, recently advancing/stalled/unknown progress, chain/block-store agreement, fork-head evidence, and P2P gossip availability. Peer count remains unavailable. Head evidence older than the bounded 300-second threshold is marked stale. |
 | APIs | Deduplicated JSON-RPC, gRPC, REST, and administrative component availability with local/private/public/unknown exposure classification; addresses and ports are never returned. Public administrative exposure produces an unsafe warning. The live target produced the warning for public JSON-RPC without exposing its binding. |
-| Producer | Primary or normalized secondary block-producer component presence, effective running state, an independently parsed address-presence boolean, and configured production percentage. Recent production counters remain unavailable. |
+| Producer | Independently parsed producer-address presence establishes configured state. Effective state additionally requires a running primary or normalized secondary producer component. A deployed service alone never implies enabled production. Configured production percentage is returned when available; recent production counters remain unavailable. |
 | Governance | Configured proposal IDs are available when safely parsed. Effective loaded proposal IDs, recent block-header votes, and network-wide status/tally remain separate and unavailable. |
 | Resources | Filesystem total/used/free byte aggregates when the fixed probe succeeds. CPU and memory remain unavailable. |
 
@@ -63,10 +63,12 @@ component-failure, and governance-unavailable evidence paths are deterministic.
 Partial evidence remains usable; a total transport failure returns a typed error
 with stable transport exit code `40`.
 
-The live run also found and closed three compatibility defects before the exit
+The live runs also found and closed four compatibility defects before the exit
 was accepted: padded base64url chain identities were initially rejected, a
-newer concurrent block-store sample could create a false mismatch, and a fixed
-secondary producer service was not included in effective producer state.
+newer concurrent block-store sample could create a false mismatch, a fixed
+secondary producer service was not included in effective producer state, and
+a seed stack's running but unconfigured producer service could create a false
+configured/effective producer result.
 
 ### Teleno adapter
 
@@ -165,6 +167,28 @@ Validated build identity: product `0.1.0-dev.0`, CLI interface `1`, core
 `0.1.0-dev.0`, development channel, Git commit
 `68de9620a044846b97e2e05252fd4ad620a4dcc5`, source state `dirty`, build
 timestamp `2026-07-13T17:33:03.570Z`.
+
+### Additional seed-profile validation
+
+A second separately approved existing legacy mainnet seed target was validated
+through an isolated temporary inventory after its SSH host identity and client
+authorization were independently confirmed. Its private identity is omitted.
+
+- Twelve of the 13 fixed catalog components were present, running, and had no
+  recorded restarts; the optional secondary producer was not configured.
+- The chain was fresh and advancing, chain/block-store evidence agreed, and
+  P2P gossip was available. Peer count remained explicitly unavailable.
+- The producer service process was running as part of the deployed stack, but
+  producer-address evidence was false. The corrected adapter therefore
+  reported configured and effective production as false.
+- Configured governance proposals were empty; effective, recently observed,
+  and network-wide governance evidence remained explicitly unavailable.
+- Human and JSON section matrices passed in batch mode, and the registered
+  components command returned the same sanitized contract interactively.
+- Stable pre/post component, artifact, restart, runtime, producer, and
+  governance evidence matched exactly while the chain continued advancing.
+- Every response remained read-only and non-persisting, the public boundary
+  scan was clean, and the temporary inventory was removed after validation.
 
 ## 7. Scope Audit
 
