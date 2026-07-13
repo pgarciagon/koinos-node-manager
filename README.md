@@ -42,6 +42,11 @@ at this stage.
 
 Requirements: Node.js 22 or later.
 
+For a complete operator walkthrough covering local installation, the linked
+`knm` executable, SSH key setup, persistent inventory, an existing legacy
+mainnet seed, batch inspection, interactive mode, and troubleshooting, see
+[Local CLI And Legacy Seed Inspection Guide](docs/guides/LOCAL_CLI_AND_SEED_INSPECTION.md).
+
 ```bash
 npm install
 npm run cli -- paths

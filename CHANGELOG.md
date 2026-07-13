@@ -93,6 +93,9 @@ All notable changes to Koinos Node Manager will be documented in this file.
 
 ### Changed
 
+- Consolidated local CLI installation, SSH key onboarding, persisted seed-node
+  registration, read-only inspection, interactive use, and troubleshooting into
+  one operator guide linked from the README.
 - Refocused the active implementation roadmap on a read-only MVP for inspecting
   existing legacy multiservice nodes, with a shared versioned inspection
   contract for CLI, Teleno compatibility, Electron, and a future controller.
