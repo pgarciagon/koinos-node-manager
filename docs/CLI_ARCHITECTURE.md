@@ -1,6 +1,6 @@
 # CLI Architecture
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## Executable Verticals
 
@@ -45,6 +45,83 @@ FileSystemInventoryRepository / SimulatedNodeRepository adapters
 Electron main will call the same core use case directly. It must not parse the
 human CLI table or use the CLI process as its primary integration mechanism.
 
+## Runtime Inspection Compatibility Layer
+
+The focused MVP implements one read-only compatibility boundary for existing
+Koinos runtimes:
+
+```text
+batch CLI / interactive CLI / Electron main / future controller
+                         |
+                  inspectNode use case
+                         |
+       public sanitized NodeInspectionSnapshot
+                         |
+              RuntimeInspectionAdapter
+                 /                 \
+LegacyMultiserviceInspectionAdapter  TelenoInspectionAdapter
+                 |                  |
+ allowlisted SSH + Docker/config/RPC  versioned read-only runtime status RPC
+```
+
+`NodeInspectionSnapshot` is UI-neutral and versioned independently when its
+compatibility contract requires it. It groups overview, components, chain,
+governance, producer, API, and optional resource evidence. Each field or group
+records availability, capture time, source kind, and a typed reason when the
+fact is unavailable or unknown. Raw process output, Docker objects, config
+files, RPC payloads, endpoints, peer identities, host aliases, and producer
+addresses never cross the public DTO boundary.
+
+`RuntimeInspectionAdapter` exposes capabilities and inspection only. It does
+not install, adopt, configure, execute user-authored commands, or mutate a
+runtime. The legacy adapter maps separate multiservice containers to normalized
+`components`; the Teleno adapter maps embedded subsystems to the same concept.
+CLI and GUI presentation code therefore depend on capability and evidence
+semantics, not flavor-specific process layouts.
+
+`inspectNode` resolves the opaque connection reference and exact private SSH
+alias, then binds that private record to `ReadOnlyProbeTransport`. Runtime
+adapters receive only a narrowed `RuntimeInspectionProbe` port and never the
+connection record, alias, host, user, or transport implementation.
+
+The multiservice adapter is implemented first because inspecting existing
+multiservice deployments is the focused MVP. It may use only fixed,
+allowlisted, bounded read-only SSH probes and existing JSON-RPC/configuration
+surfaces. The existing Phase 3 transport must be extended by adding typed probe
+identifiers, never arbitrary command text. Teleno parity follows through its
+existing versioned status surface or the smallest compatible read-only
+extension owned by the Teleno repository.
+
+Governance normalization deliberately distinguishes configured proposal IDs,
+effective proposal IDs loaded by the process, proposal votes observed in block
+headers, and network-wide proposal status/tally. Reachability alone never
+upgrades evidence authority. Missing capability data stays explicit and does
+not become a placeholder observation.
+
+The implemented boundary consists of:
+
+- `src/domain/inspection.ts`: snapshot schema `1`, contract `1.0.0`,
+  capabilities, evidence, availability, warnings, and public DTO types;
+- `src/core/runtime-inspection-adapter.ts`: UI- and transport-neutral adapter
+  contract;
+- `src/core/inspect-node.ts`: node, authority, opaque reference, exact alias,
+  and adapter selection use case;
+- `src/core/sanitize-inspection.ts`: fail-closed public DTO boundary;
+- `src/core/node-inspection-api.ts`: narrow versioned application API for CLI,
+  Electron main, and a future controller;
+- `src/adapters/inspection/legacy-multiservice-inspection-adapter.ts`: legacy
+  Docker/configuration/JSON-RPC normalization; and
+- `src/adapters/inspection/teleno-inspection-adapter.ts`: current Teleno
+  `node.get_status` normalization with explicit capability gaps.
+
+The inspection probes extend `ReadOnlyProbeTransport` with typed identifiers
+only. `SshReadOnlyProbeTransport` maps those identifiers to constant argument
+vectors and rejects unknown probe kinds before invoking SSH. The Docker query
+is restricted to a fixed component catalog; configuration inspection emits a
+small versioned fact format and never raw configuration; JSON-RPC probes use
+fixed local methods. Neither the application API nor an adapter accepts command
+text.
+
 ## Connection, Probe, Discovery, And Adoption Core
 
 Phase 3 adds peer adapters over reusable ports rather than placing SSH or
@@ -69,12 +146,12 @@ adoption reviews. It uses private permissions, synchronized atomic
 replacement, optimistic revisions, a writer lock, bounded backups, migration,
 sanitized quarantine, and explicit recovery.
 
-`ReadOnlyProbeTransport` accepts only `connection.handshake`,
-`host.inventory`, and `peers.snapshot`. The SSH adapter maps those identifiers
-to constant commands, invokes `ssh` directly without a local shell, applies
-batch authentication, bounded connection and total timeouts, and capped
-output. There is no API for user-authored command text, remote shell access, or
-a resolved host, user, password, token, or key path.
+`ReadOnlyProbeTransport` accepts a closed union of connection, discovery, and
+node-inspection probe identifiers. The SSH adapter maps those identifiers to
+constant commands, invokes `ssh` directly without a local shell, applies batch
+authentication, bounded connection and total timeouts, and capped output.
+There is no API for user-authored command text, remote shell access, or a
+resolved host, user, password, token, or key path.
 
 SSH targets are exact `Host` aliases from SSH config or bounded includes;
 wildcard matches are not configured targets. Host discovery reads a strict
@@ -278,9 +355,11 @@ immediately with `INTERACTIVE_TTY_REQUIRED` and exit code `2`.
 
 ## Next Steps
 
-1. Validate Phase 3 read-only inspection and adoption metadata against a
-   separately approved disposable testnet target.
-2. Begin Phase 4 real health and reachability only after recording the Phase 3
-   live result honestly.
-3. Add large, conflicting, unsafe, and interrupted simulation scenarios.
-4. Expose the same core use cases through an Electron-main typed bridge.
+1. Review the completed deterministic and separately approved live inspection
+   evidence before unfreezing any broader fleet scope.
+2. Review the explicit runtime evidence gaps and, only where justified, propose
+   the smallest versioned read-only additions in the owning runtime repository.
+3. Build a thin Electron-main bridge and read-only dashboard over
+   `NodeInspectionApi`; do not add runtime-specific renderer logic.
+4. Keep Phase 3 live adoption validation recorded as pending; it is independent
+   of this inspection-only MVP and must not be claimed as passed.

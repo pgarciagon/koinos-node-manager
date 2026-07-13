@@ -1,6 +1,6 @@
 # Product And Repository Boundary
 
-Last updated: 2026-07-11
+Last updated: 2026-07-13
 
 ## Decision
 
@@ -27,6 +27,8 @@ inventory, health policies, rollouts, receipts, and recovery workflows.
 - fleet inventory and desired/observed state;
 - remote and optional additional local nodes;
 - SSH/server connection references;
+- runtime-neutral, read-only inspection snapshots and flavor adapters for
+  existing nodes;
 - multi-node health and alerts;
 - install, upgrade, rollback, backup, and restore plans;
 - canary and sequential fleet rollouts;
@@ -48,6 +50,7 @@ Potential shared packages must be independently versioned and must not import
 application UI or application persistence:
 
 - node capability and health contracts;
+- read-only runtime inspection, evidence, and sanitized public DTO contracts;
 - Teleno administrative client;
 - artifact manifest and build-identity schemas;
 - plan, progress, receipt, and redaction primitives;

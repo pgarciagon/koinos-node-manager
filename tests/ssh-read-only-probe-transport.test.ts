@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, it } from 'node:test'
-import { SshReadOnlyProbeTransport } from '../src/adapters/ssh/ssh-read-only-probe-transport.js'
+import {
+  ALLOWLISTED_REMOTE_PROBES,
+  SshReadOnlyProbeTransport
+} from '../src/adapters/ssh/ssh-read-only-probe-transport.js'
 import type { ConnectionRecord } from '../src/domain/connection.js'
 
 const roots: string[] = []
@@ -41,8 +45,8 @@ describe('SSH read-only probe transport', () => {
     assert.ok(args.includes('BatchMode=yes'))
     assert.ok(args.includes('ConnectTimeout=5'))
     assert.equal(args[args.indexOf('--') + 1], 'configured-alias')
-    assert.equal(args[args.indexOf('--') + 2], 'sh')
-    assert.equal(args[args.indexOf('--') + 3], '-lc')
+    assert.match(args[args.indexOf('--') + 2] ?? '', /^sh -lc '/)
+    assert.match(args[args.indexOf('--') + 2] ?? '', /KNM_HANDSHAKE_V1/)
     assert.doesNotMatch(JSON.stringify(args), /HostName|private-user|private-key/)
   })
 
@@ -61,6 +65,26 @@ describe('SSH read-only probe transport', () => {
       assert.equal(result.outcome, testCase.expected)
       assert.equal(result.payload, null)
       assert.ok(result.durationMs >= 0 && result.durationMs <= 30_000)
+    }
+  })
+
+  it('rejects an out-of-catalog probe identifier before invoking SSH', async () => {
+    const fake = await executable("process.stdout.write('must-not-run\\n')")
+    const transport = new SshReadOnlyProbeTransport({ sshExecutable: fake.path })
+    const result = await transport.execute({
+      connection: connection(),
+      kind: 'user.authored.command' as never,
+      timeoutMs: 5_000
+    })
+    assert.equal(result.outcome, 'unsupported')
+    await assert.rejects(readFile(fake.argsFile, 'utf8'))
+  })
+
+  it('keeps every allowlisted remote probe syntactically valid and fixed', () => {
+    for (const [kind, command] of Object.entries(ALLOWLISTED_REMOTE_PROBES)) {
+      const syntax = spawnSync('sh', ['-n', '-c', command], { encoding: 'utf8' })
+      assert.equal(syntax.status, 0, `${kind}: ${syntax.stderr}`)
+      assert.doesNotMatch(command, /\$\{(?:command|userInput|hostAlias)\}/)
     }
   })
 })

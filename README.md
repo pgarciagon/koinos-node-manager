@@ -18,7 +18,10 @@ It is intentionally separate from
 This repository is in active CLI implementation. CLI Phases 0, 1, 1.5, and 2
 are complete. Phase 3 connections, discovery, and adoption are implemented and
 deterministically validated; its disposable-live-testnet exit criterion remains
-pending because no target has been separately approved. The compiled executable provides batch commands and a prompt-driven
+pending because no target has been separately approved. The focused Phase 4
+read-only inspection MVP is implemented, deterministically validated, and has
+passed a separately approved strictly read-only live multiservice validation.
+The compiled executable provides batch commands and a prompt-driven
 interactive terminal over the same typed command executor and functional core.
 It includes stable structured errors and exit codes, human and JSON output,
 deterministic simulations, hierarchical help and completion, exact build
@@ -172,6 +175,64 @@ and wallet authority remain disabled.
 discovery storage without contacting any host. Remote handshake probes occur
 only with the explicit `doctor --check-connections` option.
 
+## Read-Only Node Inspection MVP
+
+An existing inventory node can be inspected through its opaque connection
+reference without persisting observations or changing either inventory or
+runtime state:
+
+```bash
+npm run cli -- connections add ssh \
+  --id lab-target \
+  --host-alias my-private-ssh-alias
+
+npm run cli -- nodes add \
+  --id legacy-observer \
+  --name "Legacy Observer" \
+  --management connected \
+  --origin imported \
+  --flavor legacy-microservices \
+  --network testnet \
+  --location remote \
+  --environment linux \
+  --authority observe \
+  --connection-ref connection:lab-target \
+  --function observer
+
+npm run cli -- nodes inspect legacy-observer
+npm run cli -- nodes inspect legacy-observer --section components
+npm run cli -- nodes inspect legacy-observer --section governance --output json
+```
+
+`nodes inspect` collects only fixed, typed, bounded read-only probes. The
+multiservice adapter normalizes Docker services as runtime-neutral components,
+interprets a restricted set of non-secret configuration facts, and uses
+existing Koinos JSON-RPC queries. Callers cannot provide commands. Private SSH,
+host, endpoint, producer, peer, configuration, path, credential, token, and raw
+probe values do not cross the public snapshot boundary.
+
+The schema `1`, contract `1.0.0` `NodeInspectionSnapshot` represents overview,
+components, chain, API exposure, producer, governance, and optional resource
+evidence. Every fact remains `available`, `unavailable`, or `unknown` with
+provenance, freshness, authority, and a typed reason. Configured governance
+proposals, proposals loaded by the process, recently observed votes, and
+network-wide proposal status remain separate facts. Missing runtime support is
+never inferred.
+
+The CLI and a narrow versioned application API return the same sanitized DTO.
+Interactive mode uses the same registered command, help, completion, and use
+case as batch mode. Electron main can call that application API directly; a
+renderer does not need to parse CLI output or understand SSH, Docker, or raw
+RPC responses.
+
+The legacy adapter currently exposes safe evidence available from Docker,
+restricted configuration interpretation, and existing RPC methods. Peer count,
+effective loaded proposal IDs, recent block-header proposal votes,
+network-wide proposal tallies, recent production counters, and CPU/memory
+remain explicitly unavailable where the runtime has no suitable narrow status
+surface. The Teleno adapter maps its existing `node.get_status` response into
+the same contract and reports its additional gaps explicitly.
+
 Filter the simulated inventory:
 
 ```bash
@@ -233,6 +294,7 @@ build time.
 - [CLI Phase 3 implementation plan](docs/plans/CLI_PHASE_3_IMPLEMENTATION_PLAN.md)
 - [CLI Phase 2 persisted inventory audit](docs/validation/CLI_PHASE_2_PERSISTED_INVENTORY_AUDIT.md)
 - [CLI Phase 3 completion audit](docs/validation/CLI_PHASE_3_CONNECTIONS_DISCOVERY_ADOPTION_AUDIT.md)
+- [Read-only inspection MVP completion audit](docs/validation/CLI_PHASE_4_MULTISERVICE_INSPECTION_MVP_AUDIT.md)
 - [Archived source plans](docs/archive/README.md)
 - [UI explorations](assets/ui/)
 

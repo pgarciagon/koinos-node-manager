@@ -12,12 +12,13 @@ import {
   OBSERVATION_FRESHNESS_STATES
 } from '../domain/node.js'
 import { NODE_DETAIL_SECTIONS, OUTPUT_FORMATS } from './output.js'
+import { INSPECTION_SECTIONS } from '../domain/inspection.js'
 import { runInteractiveCommand } from './commands/interactive.js'
 import { runConnectionsAddSsh, runConnectionsList, runConnectionsRemove, runConnectionsShow, runConnectionsTest } from './commands/connections.js'
 import { runDiscoverHost, runDiscoverPeers, runDiscoveriesDismiss, runDiscoveriesList, runDiscoveriesShow } from './commands/discovery.js'
 import { runAdoptionApply, runAdoptionInspect, runAdoptionList, runAdoptionPlan } from './commands/adoption.js'
 import { runDoctor } from './commands/doctor.js'
-import { runNodesAdd, runNodesList, runNodesRemove, runNodesShow, runNodesUpdate } from './commands/nodes.js'
+import { runNodesAdd, runNodesInspect, runNodesList, runNodesRemove, runNodesShow, runNodesUpdate } from './commands/nodes.js'
 import { runPaths } from './commands/paths.js'
 import { runSimulationScenarios } from './commands/simulation.js'
 import { runVersion } from './commands/version.js'
@@ -96,6 +97,19 @@ const commandDefinitions = [
     ],
     completion: { positionalSources: ['node-id'] },
     run: (args, runtime) => runNodesShow(args, runtime.applicationContext())
+  },
+  {
+    path: ['nodes', 'inspect'],
+    commandName: 'nodes.inspect',
+    summary: 'Collect a bounded sanitized read-only snapshot from one existing node.',
+    usage: 'knm nodes inspect <node-id> [--section overview|components|chain|governance] [--timeout-ms <milliseconds>] [--output table|json]',
+    options: [
+      { syntax: '--section <name>', description: 'Collect only overview, components, chain, or governance evidence.', values: INSPECTION_SECTIONS },
+      { syntax: '--timeout-ms <milliseconds>', description: 'Bound each fixed read-only probe to 1000-30000 milliseconds.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    completion: { positionalSources: ['node-id'] },
+    run: (args, runtime) => runNodesInspect(args, runtime.applicationContext())
   },
   {
     path: ['nodes', 'add'],

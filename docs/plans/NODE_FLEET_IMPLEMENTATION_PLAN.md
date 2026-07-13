@@ -2,7 +2,10 @@
 
 - Status: active; the functional core and inventory foundation are being
   delivered CLI-first through `CLI_IMPLEMENTATION_PLAN.md`
-- Last updated: 2026-07-12
+- Last updated: 2026-07-13
+- Current MVP priority: review the completed deterministic and live read-only
+  legacy multiservice inspection evidence; broad fleet mutation remains
+  deferred until an explicit next target is selected
 - Initial repository: `pgarciagon/koinos-node-manager`
 - Strategy source: `NODE_FLEET_STRATEGY.md`
 - Delivery vehicle: the `knm` CLI proves each capability first; Electron is a
@@ -29,9 +32,39 @@ Supported combinations must not become architectural assumptions. “Remote”
 must not implicitly mean Docker, and “local” must not implicitly mean one
 foreground Teleno process.
 
+### 1.1 Focused MVP outcome
+
+The immediate product outcome is not the full lifecycle roadmap. It is an
+operator-facing, read-only view of an existing multiservice node that reports:
+
+- runtime, network, chain, instance, image/build, uptime, and evidence
+  freshness;
+- normalized component state, restart counts, and artifact identity;
+- head, last irreversible block, head age, advancement/stall, block-store
+  agreement, P2P availability, and peer count when exposed;
+- API endpoint type and exposure policy without private addresses;
+- producer configured/enabled state, address presence, and recent production
+  activity without exposing the producer address; and
+- governance proposal IDs as configured, effective in the process, observed
+  in block headers, and reported by network-wide proposal status/tally.
+
+The CLI proves the contract first. A later Electron dashboard calls the same
+use case through typed IPC and renders the same public DTO; it never parses CLI
+text or interprets Docker, SSH, configuration, or RPC payloads itself.
+
 ## 2. Scope And Boundaries
 
-Included:
+Current active scope:
+
+- the focused read-only multiservice inspection MVP described above;
+- a versioned `NodeInspectionSnapshot` and runtime inspection capability
+  contract shared by CLI, Electron, and a future controller;
+- explicit evidence availability, provenance, freshness, and sanitized public
+  DTOs;
+- a legacy multiservice inspection adapter followed by Teleno inspection
+  parity;
+
+Retained long-term roadmap after the MVP review:
 
 - versioned fleet inventory and migration of current remote-node records;
 - first-class flavor, location, supervisor, artifact, instance, and role data;
@@ -56,6 +89,13 @@ Excluded from the committed roadmap:
 - a persistent remote agent as the first transport;
 - Fogata pools before Layer 3 and a contract security review;
 - mainnet producer mutation without fresh explicit approval.
+
+Frozen until the focused MVP exit is reviewed: automatic discovery/adoption
+expansion, continuous monitoring, lifecycle mutations, installation,
+start/stop/restart, logs/support bundles, backup/restore, upgrades, rollouts,
+wallets, producer changes, and all mainnet mutation. Existing Phase 3
+connection/discovery/adoption foundations may remain in the repository, but
+their pending live adoption exit does not expand the MVP scope.
 
 ## 3. Current Baseline
 
@@ -178,6 +218,47 @@ logs, public restore, private backup/restore, upgrade/verify/rollback, artifact
 identity, and producer inspection/enablement. Unsupported combinations return a
 typed reason, never empty commands or best-effort behavior.
 
+### Runtime inspection snapshot
+
+The focused MVP implements a narrower read-only port before the lifecycle
+capability contract:
+
+```text
+RuntimeInspectionAdapter
+  flavor / contractVersion / capabilities
+  inspect(target, requestedSections, timeout, boundProbe) -> NodeInspectionSnapshot
+
+NodeInspectionSnapshot
+  schemaVersion / nodeId / capturedAt / freshness
+  overview / components[] / chain / governance / producer / apis[] / resources?
+  warnings[] / evidence[]
+
+InspectionValue<T>
+  availability: available | unavailable | unknown
+  value?: T
+  reason?: typed reason
+  source / observedAt / authority
+```
+
+The public snapshot is already sanitized and contains no SSH aliases, resolved
+hosts/users, raw command output, private endpoints, peer identities, producer
+addresses, config file contents, or secret paths. `components` is the shared
+term for multiservice containers and Teleno embedded subsystems. Presentation
+layers branch on capabilities and availability, never on runtime flavor
+internals.
+
+The inspection use case resolves opaque connection references and binds the
+private connection to a probe port before adapter invocation. The first
+implementation is `LegacyMultiserviceInspectionAdapter`, using only that fixed
+allowlisted bounded probe port, Docker metadata, sanitized configuration
+parsing, and existing JSON-RPC; it never receives an SSH alias. The second
+is `TelenoInspectionAdapter`, which uses Teleno's versioned read-only status
+surface. If either runtime lacks material evidence, add the smallest versioned
+read-only runtime method in the owning repository; do not introduce a generic
+remote agent or arbitrary shell contract. Both adapters now implement the
+shared contract against their existing runtime surfaces, with absent facts
+kept explicitly unavailable.
+
 ### Lifecycle plan
 
 ```text
@@ -222,6 +303,8 @@ application services callable from the CLI, hosted in Electron main once the
 desktop adapter exists):
 
 - inventory: atomic storage, migrations, and revision checks;
+- inspection: capability negotiation, read-only evidence collection,
+  normalization, freshness, and public snapshot sanitization;
 - planning: adapter selection and immutable plans;
 - execution: queue, stop-after-current, resume, cancel, events, receipts;
 - health: bounded read-only polling and snapshots;
@@ -268,12 +351,40 @@ Exit: valid records migrate without losing trust evidence; ambiguous records
 are quarantined rather than guessed (quarantine behavior already implemented
 for corrupt inventories); rollback works before node mutation.
 
-### B. Runtime and artifact foundation
+### B. Runtime inspection compatibility and multiservice MVP
 
-Implement the Teleno adapter first. It validates configuration, layout, ports,
-build identity, app/runtime compatibility, supervisors, health, and restore
-progress. Local native artifacts use release version, Git identity, and SHA-256;
-remote containers use immutable digests.
+The implemented read-only legacy multiservice adapter validates the
+runtime flavor and network, then collects only requested snapshot sections
+through fixed allowlisted probes. It normalizes separate Docker services,
+runtime configuration, and node JSON-RPC into the shared inspection contract.
+Partial capabilities, unavailable services, malformed responses, stale
+evidence, and unreachable targets remain explicit typed outcomes.
+
+The minimum CLI surface is one vertical:
+
+```text
+knm nodes inspect <node-id>
+  [--section overview|components|chain|governance]
+  [--output table|json]
+```
+
+Teleno inspection parity is implemented against the current status surface
+using the same adapter contract. Extend runtime status APIs only for evidence
+that cannot be obtained safely from existing interfaces and is approved as
+necessary after the live audit. Runtime API changes remain in the relevant
+runtime repository.
+
+Exit: an approved existing or disposable multiservice node is inspected
+without mutation; the snapshot distinguishes component, chain, producer, and
+governance facts; unsupported data is explicit; the CLI and a typed GUI
+consumer can use the same sanitized DTO.
+
+### B.1 Deferred runtime and artifact foundation
+
+After the focused MVP review, extend the Teleno lifecycle adapter to validate
+configuration, layout, ports, build identity, app/runtime compatibility,
+supervisors, health, and restore progress. Local native artifacts use release
+version, Git identity, and SHA-256; remote containers use immutable digests.
 
 Artifact manifests include platform, architecture, digest/checksum, signature,
 minimum app version, config/database compatibility, and rollback metadata.
@@ -397,12 +508,19 @@ observer; mainnet execution is impossible.
 
 ## 8. UI, Copy, And Accessibility
 
-Fleet overview shows counts plus prominent unsafe/degraded nodes. Node rows show
-network, role, location, flavor, supervisor, artifact, health, head freshness,
-peers, disk, and active operation. Details use Overview, Lifecycle, Health,
-Backups, Logs, Receipts, and Producer sections. Rollout review exposes order,
-canary, plan differences, confirmations, progress, stop-after-current, and
-evidence. Preserve simple and expert modes.
+The first desktop surface is a thin read-only dashboard over
+`NodeInspectionSnapshot`. Its node detail uses Overview, Components, Chain, and
+Governance sections, shows capture time and availability reasons, distinguishes
+configured/effective/observed/network governance facts, and never exposes raw
+SSH, Docker, configuration, or RPC data. Refresh is explicit in the first MVP;
+continuous background polling is deferred.
+
+The later fleet overview shows counts plus prominent unsafe/degraded nodes.
+Node rows show network, role, location, flavor, supervisor, artifact, health,
+head freshness, peers, disk, and active operation. Details use Overview,
+Lifecycle, Health, Backups, Logs, Receipts, and Producer sections. Rollout
+review exposes order, canary, plan differences, confirmations, progress,
+stop-after-current, and evidence. Preserve simple and expert modes.
 
 Follow the first-run assistant palette and existing operational density. Avoid
 marketing cards and oversized copy. Use parent padding/gap, verify no accidental
@@ -414,6 +532,11 @@ consistent terminology and safety meaning.
 
 ### Unit
 
+- snapshot schema/versioning, capability negotiation, availability reasons,
+  provenance/freshness, governance fact separation, and public DTO redaction;
+- shared adapter contract tests for legacy multiservice and Teleno fixtures;
+- multiservice success, partial capability, unavailable, malformed, timeout,
+  stale, mismatched chain, and unsupported runtime cases;
 - migrations/corruption, schemas, opaque references, all conflict classes;
 - capability combinations, deterministic plans/digests/expiry;
 - confirmation/revision invalidation and rollout reducers;
@@ -423,6 +546,8 @@ consistent terminology and safety meaning.
 
 ### Electron integration
 
+- typed inspection IPC parity with the CLI use case and rejection of raw
+  transport/runtime payloads at the bridge boundary;
 - malformed IPC rejection and no renderer command/secret access;
 - atomic revision-checked storage;
 - local/SSH lifecycle parity;
@@ -440,6 +565,8 @@ consistent terminology and safety meaning.
 
 ### Live testnet
 
+- approved existing or disposable multiservice inspection with sanitized
+  evidence and a no-mutation audit;
 - two local plus one remote observer;
 - foreground, launchd, Docker, then systemd;
 - lifecycle, backup, successful upgrade, injected rollback failure;
@@ -491,11 +618,33 @@ Exit: existing users migrate without losing remote functionality (holds
 trivially today — there are no existing users of this repository; the exit
 re-applies when Koinos One records are imported).
 
-### Phase 2 — Runtime adapter and local instances
+### Phase 2 — Existing multiservice inspection MVP (complete)
 
-1. Capability contract and Teleno adapter.
+1. **Done:** Versioned `NodeInspectionSnapshot`, capability, evidence, and
+   sanitized DTO contracts.
+2. **Done:** Legacy multiservice adapter over opaque SSH references and
+   allowlisted read-only Docker/configuration/JSON-RPC probes.
+3. **Done:** CLI overview, components, chain, and governance inspection
+   sections.
+4. **Done:** Deterministic contract, sanitization, partial-capability, failure,
+   batch, interactive, restart, and compiled-CLI validation.
+5. **Done:** Separately approved live multiservice read-only validation with
+   matching pre/post runtime evidence.
+6. **Done for the current status surface:** Teleno inspection parity against
+   the same contract.
+7. **Application boundary done; UI deferred:** Narrow typed
+   `NodeInspectionApi` for Electron main. The thin read-only dashboard is a
+   later presentation task, not part of the completed CLI vertical.
+
+Exit: the strategy MVP Layer criterion passes. Existing Phase 3 adoption live
+validation may still be pending because inspection does not imply adoption or
+managed authority.
+
+### Phase 2.5 — Runtime lifecycle adapter and local instances (deferred)
+
+1. Teleno lifecycle capability contract and adapter.
 2. Artifact verification/history.
-3. port/basedir/service allocation.
+3. Port/basedir/service allocation.
 4. Foreground executor, then packaged launchd.
 5. Two-local-plus-one-remote validation.
 
@@ -581,23 +730,16 @@ Fogata/provider/EVM explorations are not part of this definition.
 
 ## 13. Immediate Next Actions
 
-1. Produce the Phase 0 gap matrix with file and test evidence — still open;
-   the CLI plan's per-phase validation records cover this repository, but the
-   Koinos One extraction inventory has not been produced.
-2. Add and approve the ADR referenced by the strategy — still open.
-3. Decide runtime packaging and CLI ownership — decided: this repository owns
-   the `knm` CLI and the shared functional core; Electron consumes the same
-   use cases later.
-4. Freeze inventory fixtures and design migrations — done for this
-   repository's schema `0`/`1`; still open for Koinos One record import.
-5. Define lifecycle plan, execution, receipt, and health schemas — still
-   open; scheduled against CLI Phases 4–5.
-6. Prepare disposable local/remote testnet validation targets — still open;
-   needed from CLI Phase 3 onward.
-7. Deliver connections, discovery, and adoption (CLI Phase 3) as the next
-   implementation slice feeding fleet Phase 2.
-8. Re-estimate later phases from measured cost of the delivered CLI phases
-   rather than speculative calendar dates.
+1. Review the completed sanitized MVP audit and the target's public JSON-RPC
+   exposure warning before selecting any broader scope.
+2. Audit missing evidence. Propose only the smallest versioned read-only
+   multiservice RPC additions that the audit proves necessary.
+3. Propose the smallest Teleno status additions for the explicit capability
+   gaps; make no cross-repository change without authorization.
+4. Implement the thin Electron-main/read-only renderer adapter over
+   `NodeInspectionApi`, without CLI parsing or runtime-specific renderer logic.
+5. Review MVP evidence with the product team before unfreezing lifecycle,
+   monitoring, logs, backups, upgrades, rollouts, or producer work.
 
 ## 14. Amendment Summary — 2026-07-12
 
@@ -651,3 +793,22 @@ producer and mainnet gating, and the test matrix. Nothing in the implemented
 code contradicts them; sanitization (invariant 9) and observer-safe defaults
 (invariant 1) are already enforced by `src/core/sanitize-node.ts` and
 `src/core/node-inventory.ts` respectively.
+
+## 15. MVP Refocus — 2026-07-13
+
+Product review narrowed the immediate goal from broad fleet management to
+read-only inspection of existing legacy multiservice nodes. This amendment
+adds the shared snapshot and compatibility contract, makes multiservice
+inspection fleet Phase 2, places Teleno inspection parity before lifecycle
+work, defines the future GUI as a peer consumer of the same sanitized DTO, and
+freezes broader operations until the MVP exit is reviewed. Existing completed
+CLI phases and deterministic Phase 3 connection/discovery/adoption work remain
+valid foundations.
+
+The deterministic refocused implementation is now delivered: the shared
+snapshot, typed application API, legacy multiservice adapter, current-surface
+Teleno adapter, batch/interactive command, sanitization boundary, fixed probes,
+and deterministic/compiled tests are present. No target was separately
+approved during the initial deterministic implementation; a subsequent
+separately authorized strictly read-only run passed with identical pre/post
+runtime evidence. Only the thin desktop presentation remains pending.

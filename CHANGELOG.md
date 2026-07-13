@@ -67,9 +67,32 @@ All notable changes to Koinos Node Manager will be documented in this file.
   inventory records without runtime mutation.
 - Phase 3 batch, interactive, restart, repository, migration, sanitization,
   fake-transport, timeout, structured-output, and compiled-CLI validation.
+- Versioned, UI-neutral `NodeInspectionSnapshot` schema and inspection
+  capability/evidence contracts with explicit available, unavailable, and
+  unknown states, provenance, freshness, authority, warnings, and typed
+  reasons.
+- Sanitized public inspection DTO and versioned `NodeInspectionApi` suitable
+  for direct Electron-main and future controller use without CLI parsing.
+- `LegacyMultiserviceInspectionAdapter` over fixed bounded read-only Docker,
+  restricted configuration, Koinos JSON-RPC, and storage probes.
+- `TelenoInspectionAdapter` mapping the existing versioned `node.get_status`
+  surface into the same runtime-neutral contract with unsupported facts left
+  explicit.
+- `knm nodes inspect <node-id>` overview, components, chain, and governance
+  views in human and schema-versioned JSON output, with batch/interactive help
+  and completion parity.
+- Deterministic inspection schema, evidence, adapter-contract, fixture,
+  redaction, invalid-input, typed-error, restart, interactive, and compiled-CLI
+  validation.
+- Separately approved live legacy-multiservice validation with identical
+  pre/post configuration and component evidence, batch/interactive parity, and
+  no persisted inspection state or runtime mutation.
 
 ### Changed
 
+- Refocused the active implementation roadmap on a read-only MVP for inspecting
+  existing legacy multiservice nodes, with a shared versioned inspection
+  contract for CLI, Teleno compatibility, Electron, and a future controller.
 - Structured envelopes now use schema version `2` because node records expose
   explicit state layers instead of a mixed flat state.
 - Effective inventory facts resolve verified evidence before observed evidence
@@ -93,3 +116,7 @@ All notable changes to Koinos Node Manager will be documented in this file.
 - `doctor` now checks connection-state storage, inventory connection-reference
   integrity, and exact SSH aliases without remote contact; bounded remote
   handshakes require explicit `--check-connections`.
+- Legacy chain identity parsing now accepts bounded padded base64/base64url
+  encodings, block-store samples newer than the concurrent chain sample remain
+  unknown instead of producing a false mismatch, and the fixed secondary
+  producer service is normalized without exposing its runtime-specific name.

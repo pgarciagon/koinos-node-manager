@@ -1,6 +1,6 @@
 # Node Fleet Strategy
 
-- Date: 2026-07-09
+- Date: 2026-07-13
 - Scope: unified strategy for running and managing multiple Koinos nodes from
   Koinos Node Manager — local and remote, observer and producer
 - Supersedes and archives:
@@ -19,12 +19,62 @@ Koinos Node Manager is a dedicated fleet product:
 an operator — expert or not — can install, run, monitor, upgrade, and recover
 any number of Koinos nodes, locally or on their own servers, and can later
 promote validated observers into independent producers. The native runtime
-(`teleno_node`) now lives in its own repository (`koinos/teleno`) and is the
-first node flavor; the architecture must not assume it is the only one.
+(`teleno_node`) now lives in its own repository (`koinos/teleno`) and remains
+the first lifecycle-management flavor. Existing multiservice nodes are the
+first inspection target; the architecture must not assume either runtime is
+the only one.
 
 Koinos One remains a separate desktop product for one primary local Teleno
 node. Shared functionality is delivered through versioned contracts and
 libraries, not by merging both products' navigation or persisted state.
+
+## Current MVP Focus — Existing Multiservice Inspection
+
+The first shippable Node Manager product is deliberately narrower than the
+full fleet mission. It provides read-only inspection of existing operator-owned
+Koinos multiservice nodes. It does not install, adopt, configure, restart,
+upgrade, back up, or otherwise mutate those nodes.
+
+The MVP proves one complete vertical before broader fleet management resumes:
+
+1. define one versioned, UI-neutral `NodeInspectionSnapshot` contract;
+2. inspect an inventory node through its opaque SSH connection reference using
+   fixed, allowlisted, bounded read-only probes;
+3. normalize legacy multiservice Docker, configuration, and JSON-RPC evidence
+   behind a `LegacyMultiserviceInspectionAdapter`;
+4. expose the same snapshot through concise CLI output and versioned JSON;
+5. validate the path against a separately approved existing or disposable
+   multiservice node without runtime mutation;
+6. add a `TelenoInspectionAdapter` against the same contract; and
+7. make the proven use case available to a thin Electron dashboard through
+   typed APIs, never by parsing or spawning the CLI.
+
+Implementation status: items 1–6 are delivered, including a separately
+approved strictly read-only live audit with identical pre/post runtime
+evidence. The narrow versioned application API needed for item 7 is frozen;
+only the thin desktop presentation remains pending.
+
+The initial snapshot covers identity and network, component state, chain head
+and last irreversible block, progress/freshness, P2P availability, API
+exposure, producer configuration and activity, and governance proposal
+evidence. Governance keeps four facts distinct: proposal IDs configured for
+the producer, proposal IDs effective in the running process, proposal votes
+observed in produced block headers, and network-wide proposal status/tally.
+Missing runtime capabilities are reported as typed `unavailable` or `unknown`
+results with a reason; adapters never invent placeholder facts.
+
+Initial implementation reuses SSH, Docker metadata, configuration inspection,
+and existing JSON-RPC methods. A new remote agent or node microservice is not
+an MVP prerequisite. If evidence proves that existing interfaces cannot expose
+an important fact safely, the smallest follow-up is a versioned read-only
+runtime status method: narrow service status RPCs for multiservice and an
+extension of Teleno's existing status/capabilities surface. Runtime changes
+remain owned by their runtime repositories.
+
+Automatic discovery/adoption expansion, lifecycle mutation, continuous
+monitoring, logs/support bundles, installation, backups, upgrades, rollouts,
+wallets, producer changes, and all mainnet mutation are frozen until this MVP
+exit is met and reviewed.
 
 ## Architecture Model
 
@@ -32,11 +82,12 @@ Per ADR 0001, a managed node is the tuple **(flavor, location, supervisor)**
 with one lifecycle contract (install, start, stop, upgrade, rollback, health,
 logs, backup/restore):
 
-- **Flavor** — what runs: `teleno-monolith` today; `multiservice` and other
-  compatible implementations later. Artifacts for the Teleno flavor come from
-  the `koinos/teleno` repository: the container image `ghcr.io/koinos/teleno`
-  (digest-pinned) and native builds identified by `teleno-node-v<version>`
-  tags.
+- **Flavor** — what runs. Existing legacy multiservice nodes are the first MVP
+  inspection target; Teleno is the first native lifecycle-management flavor
+  and receives inspection parity through the same snapshot contract.
+  Artifacts for the Teleno flavor come from the `koinos/teleno` repository:
+  the container image `ghcr.io/koinos/teleno` (digest-pinned) and native builds
+  identified by `teleno-node-v<version>` tags.
 - **Location** — where it runs: `local` (direct process exec) or `remote`
   (SSH-executed command plan). Both execute the *same generated plan* over a
   different transport; this property is already implemented and must be
@@ -145,6 +196,36 @@ Known hardening debt carried forward from the MVP tracking doc:
 One roadmap replaces the three overlapping phase lists. Layers build bottom-up;
 a layer ships when its exit criteria hold on testnet (and, where stated, on a
 prodnet canary).
+
+### MVP Layer — Existing multiservice inspection
+
+Goal: give an operator an accurate, safe overview of existing multiservice
+nodes and prove the shared read model needed by the future graphical
+interface.
+
+- **Delivered:** Implement the versioned `NodeInspectionSnapshot`, capability declaration,
+  evidence provenance/freshness, and sanitized public DTO.
+- **Delivered:** Resolve opaque SSH references in the use case and implement a
+  legacy multiservice adapter over a connection-bound fixed read-only probe
+  port, Docker metadata, configuration parsing, and local node JSON-RPC. The
+  adapter never receives private connection data.
+- **Delivered:** Deliver one composable CLI vertical for overview, components, chain, and
+  governance sections in human and JSON forms.
+- **Delivered:** Validate deterministic success, partial-capability, stale,
+  malformed, unreachable, and sanitization cases, then pass a separately
+  approved live read-only validation with matching pre/post evidence.
+- **Delivered for the current status surface:** Add Teleno inspection parity and contract tests without exposing Teleno or
+  multiservice internals to the presentation layer.
+- **Application API delivered; presentation pending:** Expose the use case
+  through a narrow typed Electron-main bridge and a thin read-only dashboard
+  after the now-proven live contract.
+
+Exit: an approved existing or disposable multiservice node can be inspected
+without mutation; the operator can distinguish component health, chain
+progress, producer state, and governance evidence; unsupported facts remain
+explicit; CLI and typed GUI consumers receive the same sanitized snapshot.
+
+The following layers resume only after this exit and an explicit scope review.
 
 ### Layer 1 — Runtime and flavor foundation
 

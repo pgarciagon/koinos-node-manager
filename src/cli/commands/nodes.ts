@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util'
 import { getNode } from '../../core/get-node.js'
+import { createNodeInspectionApi } from '../../core/node-inspection-api.js'
 import { addInventoryNode, removeInventoryNode, updateInventoryNode, type UpdateNodeInput } from '../../core/node-inventory.js'
 import { listNodes, type ListNodesQuery } from '../../core/list-nodes.js'
 import { ApplicationError } from '../../core/application-error.js'
@@ -17,9 +18,11 @@ import {
   NODE_ORIGINS,
   OBSERVATION_FRESHNESS_STATES
 } from '../../domain/node.js'
+import { INSPECTION_SECTIONS } from '../../domain/inspection.js'
 import type { ApplicationContext } from '../application-context.js'
 import { CliInputError } from '../cli-input-error.js'
 import { successEnvelope } from '../envelope.js'
+import { formatInspectionHuman, formatInspectionJson } from '../inspection-output.js'
 import {
   NODE_DETAIL_SECTIONS,
   formatNodeDetail,
@@ -98,6 +101,52 @@ export async function runNodesShow(args: readonly string[], context: Application
   const section = oneOf('section', parsed.values.section, NODE_DETAIL_SECTIONS) ?? 'all'
   const node = await getNode(context.nodeRepository, nodeId)
   return output === 'json' ? formatNodeJson(node, section) : formatNodeDetail(node, section)
+}
+
+export async function runNodesInspect(args: readonly string[], context: ApplicationContext): Promise<string> {
+  const parsed = parseArgs({
+    args,
+    options: {
+      section: { type: 'string' },
+      'timeout-ms': { type: 'string', default: '10000' },
+      output: { type: 'string', default: 'table' }
+    },
+    allowPositionals: true,
+    strict: true
+  })
+  if (parsed.positionals.length !== 1) {
+    throw new CliInputError('Usage: knm nodes inspect <node-id> [--section overview|components|chain|governance] [--timeout-ms <milliseconds>] [--output table|json]')
+  }
+  const nodeId = parsed.positionals[0]
+  if (nodeId === undefined) throw new CliInputError('A node ID is required.')
+  const section = oneOf('section', parsed.values.section, INSPECTION_SECTIONS)
+  const timeoutMs = parseInspectionTimeout(parsed.values['timeout-ms'])
+  const output = parseOutputFormat(parsed.values.output)
+  if (context.connectionStateRepository === null) {
+    throw new ApplicationError({
+      code: 'NODE_INSPECTION_LOCAL_SOURCE_REQUIRED',
+      exitCode: EXIT_CODES.safetyBlocked,
+      severity: 'unsafe',
+      retryable: false,
+      message: 'Live node inspection is unavailable for deterministic inventory simulations.',
+      nextAction: 'Run without --simulation against an explicitly configured local inventory node.'
+    })
+  }
+  const inspection = await createNodeInspectionApi({
+    nodeRepository: context.nodeRepository,
+    connectionRepository: context.connectionStateRepository,
+    aliasResolver: context.aliasResolver,
+    probeTransport: context.probeTransport,
+    adapters: context.inspectionAdapters,
+    ...(context.now === undefined ? {} : { now: context.now })
+  }).inspect({
+    nodeId,
+    sections: section === undefined ? INSPECTION_SECTIONS : [section],
+    timeoutMs
+  })
+  return output === 'json'
+    ? formatInspectionJson(inspection.snapshot, section)
+    : formatInspectionHuman(inspection.snapshot, section)
 }
 
 export async function runNodesAdd(args: readonly string[], context: ApplicationContext): Promise<string> {
@@ -246,6 +295,12 @@ export async function runNodesRemove(args: readonly string[], context: Applicati
 function requiredOption(name: string, value: string | undefined): string {
   if (value !== undefined) return value
   throw new CliInputError(`The ${name} option is required.`)
+}
+
+function parseInspectionTimeout(value: string | undefined): number {
+  const parsed = Number(value)
+  if (Number.isSafeInteger(parsed) && parsed >= 1000 && parsed <= 30000) return parsed
+  throw new CliInputError('Timeout must be an integer between 1000 and 30000 milliseconds.')
 }
 
 function repeatedOneOf<T extends string>(name: string, values: readonly string[] | undefined, allowed: readonly T[]): readonly T[] {

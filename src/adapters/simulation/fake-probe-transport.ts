@@ -3,6 +3,7 @@ import type { ConnectionTestOutcome } from '../../domain/connection.js'
 
 export type FakeProbeScenario = {
   outcome: ConnectionTestOutcome
+  outcomes?: Partial<Record<ProbeKind, ConnectionTestOutcome>>
   payloads?: Partial<Record<ProbeKind, string>>
   durationMs?: number
 }
@@ -14,10 +15,11 @@ export class FakeProbeTransport implements ReadOnlyProbeTransport {
 
   async execute(request: ProbeRequest): Promise<ProbeResponse> {
     this.requests.push(structuredClone(request))
+    const outcome = this.scenario.outcomes?.[request.kind] ?? this.scenario.outcome
     return {
-      outcome: this.scenario.outcome,
+      outcome,
       durationMs: this.scenario.durationMs ?? 25,
-      payload: this.scenario.outcome === 'success' ? this.scenario.payloads?.[request.kind] ?? null : null
+      payload: outcome === 'success' ? this.scenario.payloads?.[request.kind] ?? null : null
     }
   }
 }

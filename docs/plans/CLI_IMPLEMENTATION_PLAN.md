@@ -1,9 +1,13 @@
 # CLI Implementation Plan
 
 - Status: active
-- Last updated: 2026-07-12
+- Last updated: 2026-07-13
 - Product version: `0.1.0-dev.0`
-- Current implementation: Phases 0, 1, 1.5, and 2 complete; Phase 3 deterministic implementation complete with live disposable-target exit pending
+- Current implementation: Phases 0, 1, 1.5, 2, and the focused Phase 4
+  inspection MVP complete; Phase 3 deterministic implementation is complete
+  with its separate disposable-live-adoption exit pending
+- Current delivery target: review the completed Phase 4 evidence and retain
+  the broader monitoring/lifecycle scope freeze until an explicit next target
 - Delivery principle: CLI first, shared functional core, Electron as a peer
   adapter
 - Intermediate interactive shell: `INTERACTIVE_CLI_IMPLEMENTATION_PLAN.md`
@@ -15,22 +19,21 @@ prove the complete Koinos Node Manager functional model before equivalent
 desktop workflows are added. The CLI is a product interface over the shared
 core, not the core itself and not a subprocess API for Electron.
 
-The first useful operator journey is:
+The current MVP operator journey is intentionally narrow:
 
 ```text
 initialize and diagnose
   -> inventory nodes
-  -> connect or discover
-  -> inspect and adopt
-  -> monitor health and logs
-  -> create an immutable plan
-  -> review and confirm
-  -> execute and verify
-  -> inspect the receipt
+  -> reference an existing SSH connection
+  -> inspect one existing multiservice node
+  -> compare overview, components, chain, and governance evidence
+  -> consume the same snapshot from a future desktop dashboard
 ```
 
-The first delivery concentrates on observer operations. Producer mutation,
-VHP movement, Fogata, cloud provisioning, and a persistent node agent remain
+The broader journey through discovery, adoption, health monitoring, logs,
+plans, execution, receipts, lifecycle, backups, and upgrades remains in the
+roadmap, but is not the current implementation target. Producer mutation, VHP
+movement, Fogata, cloud provisioning, and a persistent node agent remain
 outside the initial functional milestone.
 
 ## Implementation Progress
@@ -82,11 +85,26 @@ Implemented on `codex/cli-list-nodes`:
   adoption completion;
 - `doctor` connection-reference, alias, discovery-storage, recovery, and
   explicit remote-probe checks;
+- versioned `NodeInspectionSnapshot`, runtime capabilities, typed evidence,
+  availability, freshness, precedence, warnings, and sanitized public DTO;
+- `LegacyMultiserviceInspectionAdapter` over fixed bounded Docker,
+  restricted-configuration, JSON-RPC, and storage probes;
+- `TelenoInspectionAdapter` over the current versioned `node.get_status`
+  surface with missing capabilities explicit;
+- `knm nodes inspect <node-id>` overview, components, chain, and governance
+  sections in human and schema-versioned JSON output;
+- versioned `NodeInspectionApi` for direct CLI, Electron-main, and future
+  controller use without CLI parsing;
+- inspection unit, adapter-contract, deterministic fixture, redaction,
+  batch/interactive parity, restart, typed-error, and compiled-CLI tests;
 - compiled CLI and unit/end-to-end command tests.
 
-Phase 3 live validation remains pending until a disposable testnet target is
-separately approved. Real health, logs, lifecycle plans and execution, backups,
-upgrades, producer operations, and managed-runtime mutations remain planned.
+Phase 3 live adoption validation remains pending. Phase 4 live multiservice
+inspection passed after separate explicit approval for a strictly read-only
+run; matching pre/post evidence proved that no configuration, component, or
+producer state changed. Real health, logs, lifecycle plans and execution,
+backups, upgrades, producer operations, and managed-runtime mutations remain
+planned and frozen.
 
 ## 2. Design Decisions
 
@@ -354,17 +372,44 @@ contacts or mutates the runtime during plan or application.
 
 ```text
 knm nodes inspect <node-id>
-knm nodes status <node-id>
-knm nodes health <node-id>
-knm nodes reachability <node-id>
-knm fleet health [--only-problems]
+  [--section overview|components|chain|governance]
+  [--output table|json]
 ```
 
-`show` reads stored state; `inspect` contacts the node and collects new
-evidence. Health includes freshness, supervisor, chain, head progress, peers,
-disk, components, role, artifact, exposure, backup freshness, and stop criteria.
-Reachability separates local listening, host firewall, public reachability,
-advertised identity, NAT/router actions, and public administrative exposure.
+`show` reads stored inventory state; the MVP `inspect` command contacts one
+existing node and returns a fresh, sanitized `NodeInspectionSnapshot`. The
+first adapter targets legacy multiservice deployments and normalizes Docker,
+configuration, and JSON-RPC evidence into four operator sections:
+
+- `overview`: runtime flavor, instance, network, chain identity, build/image
+  identity when available, uptime, and snapshot freshness;
+- `components`: normalized component name, availability, running state,
+  restart count, and artifact identity, where supported;
+- `chain`: head, last irreversible block, head age, advancement/stall evidence,
+  block-store agreement, P2P availability, and peer count when available;
+- `governance`: configured proposal IDs, effective loaded proposal IDs,
+  recently observed block-header votes, and network proposal status/tally.
+
+Producer evidence includes enabled/configured state, address presence without
+exposing the address, and recent production activity when available. API
+evidence reports endpoint type and exposure policy without leaking private
+addresses. Storage/resource basics may be included only when existing probes
+provide bounded, sanitized evidence.
+
+Every field carries availability and evidence freshness/provenance. A missing
+runtime capability returns a typed reason; it is never replaced by a guessed
+value. Multiservice containers and Teleno embedded subsystems are both exposed
+as `components`, so presentation adapters do not branch on runtime internals.
+
+The initial implementation uses only fixed, allowlisted, bounded read-only SSH
+probes plus existing node interfaces. It does not require a new agent or
+microservice. Runtime extensions are follow-up work only where the MVP audit
+proves a material fact cannot be obtained safely. Teleno then implements the
+same inspection contract through its existing versioned status surface.
+
+`nodes status`, `nodes health`, `nodes reachability`, `fleet health`, continuous
+polling, logs, diagnostics, and support bundles are deferred until after the
+focused inspection MVP and its GUI contract have been reviewed.
 
 ### 4.9 Logs and diagnostics
 
@@ -575,15 +620,38 @@ connected limited node when authority is incomplete, without changing its
 runtime during inspection. All deterministic gates pass, but this exit remains
 pending until a disposable target is separately approved and validated.
 
-### Phase 4 — Read-only operations
+### Phase 4 — Existing multiservice inspection MVP (complete)
 
-- inspect/status/health/reachability;
-- fleet health with bounded concurrency;
-- sanitized logs and diagnostics;
-- support-bundle preview.
+1. **Done:** Define a versioned, UI-neutral `NodeInspectionSnapshot`, runtime capability
+   declaration, structured evidence provenance/freshness, and sanitized public
+   DTO in the functional core.
+2. **Done:** Resolve opaque SSH references in the use case and implement
+   `LegacyMultiserviceInspectionAdapter` over a connection-bound, fixed
+   read-only probe port for Docker metadata, runtime configuration, and
+   existing JSON-RPC methods. The adapter never receives the alias or exposes
+   arbitrary command execution.
+3. **Done:** Add `knm nodes inspect <node-id>` with overview, components, chain, and
+   governance sections in human and schema-versioned JSON output.
+4. **Done:** Keep governance facts separate: configured proposal IDs, effective loaded
+   proposal IDs, block-header votes, and network-wide proposal status/tally.
+5. **Done:** Add deterministic adapter-contract, partial-capability, unavailable,
+   malformed, timeout, stale, redaction, CLI, interactive-parity, and compiled
+   CLI tests.
+6. **Done:** Validate read-only behavior against a separately approved existing
+   multiservice node and record sanitized no-mutation evidence.
+7. **Done for the current status surface:** Implement `TelenoInspectionAdapter` parity through versioned read-only
+   runtime methods where necessary, using the same contract suite.
+8. **Done at the application boundary:** Freeze the public DTO for a narrow Electron-main typed bridge; the renderer
+   must never parse CLI output or raw SSH/Docker/RPC responses.
 
-Exit: mixed local/remote observers can be monitored without mutation, secret
-leakage, or stale healthy results.
+Exit status: passed. A separately approved existing multiservice node was
+inspected without runtime mutation; component state, chain progress, producer
+state, and governance evidence are distinguishable; unsupported facts are
+explicit; batch, interactive, and future GUI consumers receive the same
+sanitized snapshot; deterministic and compiled gates pass.
+
+Continuous monitoring, fleet health, reachability diagnosis, logs,
+diagnostics, and support bundles are not part of this phase.
 
 ### Phase 5 — Durable plans and lifecycle
 
@@ -660,8 +728,12 @@ The first two slices completed Phases 0 and 1:
    (implemented).
 
 Phases 0, 1, 1.5, and 2 are complete. Phase 3 deterministic implementation is
-complete and validated by `npm run verify`; its live disposable-testnet exit is
-pending. Phase 4 must not start until that status is handled explicitly.
+complete; its live disposable-testnet adoption exit remains pending. Phase 4's
+shared contract, multiservice and Teleno adapters, CLI vertical, application
+API, deterministic tests, compiled validation, and separately approved live
+no-mutation audit are complete. The broader monitoring and lifecycle roadmap
+stays frozen until the completed MVP evidence is reviewed and a new target is
+explicitly selected.
 
 ## 9. Amendment Summary — 2026-07-12
 
@@ -699,3 +771,19 @@ No architectural decision changed. The exit-code table, envelope
 `schemaVersion: 2` contract, command grammar, and safety classes in this plan
 match `src/core/exit-codes.ts`, `src/cli/envelope.ts`, and
 `src/cli/command-catalog.ts` as implemented.
+
+## 10. MVP Refocus — 2026-07-13
+
+The next target was narrowed after product review to read-only inspection of
+existing legacy multiservice nodes. Phase 4 now defines that vertical
+explicitly, including the common snapshot, governance evidence semantics,
+runtime compatibility adapters, approved live validation, and the typed
+boundary required by a later graphical interface. Previously listed fleet
+health, reachability, logs, diagnostics, and support bundles remain planned but
+are no longer part of Phase 4.
+
+The deterministic implementation now matches the refocused scope. It exposes
+one sanitized snapshot through batch, interactive, and typed application API
+interfaces, and includes both runtime adapters. A later separately approved
+live run passed with matching pre/post component and configuration evidence.
+No runtime repository or managed runtime state was modified.
