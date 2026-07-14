@@ -11,11 +11,13 @@ export type CommandExecutionRequest = {
   args: readonly string[]
   inventorySource: InventorySource
   terminalWidth?: number
+  privateInputs?: readonly string[]
 }
 
 export type NestedCommandOptions = {
   inventorySource?: InventorySource
   terminalWidth?: number
+  privateInputs?: readonly string[]
 }
 
 export type NestedCommandExecutor = (

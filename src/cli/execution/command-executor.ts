@@ -39,6 +39,7 @@ export async function executeCommand(
     }
     commandName = resolved.definition.commandName
     let context: ApplicationContext | undefined
+    const privateInputs = [...(request.privateInputs ?? [])]
     const runtime: CommandRuntime = {
       applicationContext: () => {
         context ??= dependencies.createApplicationContext(request.inventorySource)
@@ -48,10 +49,16 @@ export async function executeCommand(
       executeCommand: (args, options = {}) => executeCommand({
         args,
         inventorySource: options.inventorySource ?? request.inventorySource,
-        ...(options.terminalWidth === undefined ? {} : { terminalWidth: options.terminalWidth })
+        ...(options.terminalWidth === undefined ? {} : { terminalWidth: options.terminalWidth }),
+        ...(options.privateInputs === undefined ? {} : { privateInputs: options.privateInputs })
       }, dependencies),
       registry: dependencies.registry,
       inventorySource: request.inventorySource,
+      takePrivateInput: (label) => {
+        const value = privateInputs.shift()
+        if (value !== undefined && value.length > 0 && value.length <= 4096 && !/[\u0000\r\n]/.test(value)) return value
+        throw new CliInputError(`Private ${label} input is required through the dedicated stdin channel.`)
+      },
       ...(request.terminalWidth === undefined ? {} : { terminalWidth: request.terminalWidth })
     }
     const handlerResult = await resolved.definition.run(resolved.args, runtime)

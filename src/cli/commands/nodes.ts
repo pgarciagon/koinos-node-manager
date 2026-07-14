@@ -108,6 +108,7 @@ export async function runNodesInspect(args: readonly string[], context: Applicat
     args,
     options: {
       section: { type: 'string' },
+      access: { type: 'string' },
       'timeout-ms': { type: 'string', default: '10000' },
       output: { type: 'string', default: 'table' }
     },
@@ -115,11 +116,12 @@ export async function runNodesInspect(args: readonly string[], context: Applicat
     strict: true
   })
   if (parsed.positionals.length !== 1) {
-    throw new CliInputError('Usage: knm nodes inspect <node-id> [--section overview|components|chain|governance] [--timeout-ms <milliseconds>] [--output table|json]')
+    throw new CliInputError('Usage: knm nodes inspect <node-id> [--section overview|components|chain|governance] [--access quick|full|expert] [--timeout-ms <milliseconds>] [--output table|json]')
   }
   const nodeId = parsed.positionals[0]
   if (nodeId === undefined) throw new CliInputError('A node ID is required.')
   const section = oneOf('section', parsed.values.section, INSPECTION_SECTIONS)
+  const accessMode = oneOf('access', parsed.values.access, ['quick', 'full', 'expert'] as const)
   const timeoutMs = parseInspectionTimeout(parsed.values['timeout-ms'])
   const output = parseOutputFormat(parsed.values.output)
   if (context.connectionStateRepository === null) {
@@ -137,12 +139,16 @@ export async function runNodesInspect(args: readonly string[], context: Applicat
     connectionRepository: context.connectionStateRepository,
     aliasResolver: context.aliasResolver,
     probeTransport: context.probeTransport,
+    publicRpcTransport: context.publicRpcTransport,
+    publicRpcAdapter: context.publicRpcAdapter,
+    agentProbeTransport: context.agentProbeTransport,
     adapters: context.inspectionAdapters,
     ...(context.now === undefined ? {} : { now: context.now })
   }).inspect({
     nodeId,
     sections: section === undefined ? INSPECTION_SECTIONS : [section],
-    timeoutMs
+    timeoutMs,
+    ...(accessMode === undefined ? {} : { accessMode })
   })
   return output === 'json'
     ? formatInspectionJson(inspection.snapshot, section)

@@ -60,14 +60,15 @@ export async function runInteractiveCommand(
       return (await runtime.applicationContextFor(source).nodeRepository.list()).map((node) => node.id)
     },
     phase3IdsForSource: async (source) => {
-      if (source.kind === 'simulation') return { connectionIds: [], discoveryIds: [], adoptionIds: [] }
+      if (source.kind === 'simulation') return { connectionIds: [], discoveryIds: [], adoptionIds: [], onboardingIds: [] }
       const repository = runtime.applicationContextFor(source).connectionStateRepository
-      if (repository === null) return { connectionIds: [], discoveryIds: [], adoptionIds: [] }
+      if (repository === null) return { connectionIds: [], discoveryIds: [], adoptionIds: [], onboardingIds: [] }
       const state = await repository.read()
       return {
         connectionIds: state.connections.map((connection) => connection.id),
         discoveryIds: state.discoveries.map((discovery) => discovery.id),
-        adoptionIds: state.adoptionReviews.map((review) => review.id)
+        adoptionIds: state.adoptionReviews.map((review) => review.id),
+        onboardingIds: state.onboardingReviews.map((review) => review.id)
       }
     }
   })

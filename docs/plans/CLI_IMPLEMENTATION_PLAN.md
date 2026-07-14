@@ -1,16 +1,18 @@
 # CLI Implementation Plan
 
 - Status: active
-- Last updated: 2026-07-13
+- Last updated: 2026-07-14
 - Product version: `0.1.0-dev.0`
-- Current implementation: Phases 0, 1, 1.5, 2, and the focused Phase 4
-  inspection MVP complete; Phase 3 deterministic implementation is complete
-  with its separate disposable-live-adoption exit pending
-- Current delivery target: review the completed Phase 4 evidence and retain
-  the broader monitoring/lifecycle scope freeze until an explicit next target
+- Current implementation: Phases 0, 1, 1.5, 2, focused Phase 4 inspection, and
+  deterministic Phase 4.5 two-mode onboarding are complete; Phase 3 live
+  adoption, onboarding live validation, and a production agent artifact remain
+  separately pending
+- Current delivery target: preserve the completed onboarding slice while the
+  broader monitoring/lifecycle scope remains frozen
 - Delivery principle: CLI first, shared functional core, Electron as a peer
   adapter
 - Intermediate interactive shell: `INTERACTIVE_CLI_IMPLEMENTATION_PLAN.md`
+- Two-mode onboarding MVP: `NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`
 
 ## 1. Objective
 
@@ -19,7 +21,7 @@ prove the complete Koinos Node Manager functional model before equivalent
 desktop workflows are added. The CLI is a product interface over the shared
 core, not the core itself and not a subprocess API for Electron.
 
-The current MVP operator journey is intentionally narrow:
+The implemented inspection journey is intentionally narrow:
 
 ```text
 initialize and diagnose
@@ -30,11 +32,12 @@ initialize and diagnose
   -> consume the same snapshot from a future desktop dashboard
 ```
 
-The broader journey through discovery, adoption, health monitoring, logs,
-plans, execution, receipts, lifecycle, backups, and upgrades remains in the
-roadmap, but is not the current implementation target. Producer mutation, VHP
-movement, Fogata, cloud provisioning, and a persistent node agent remain
-outside the initial functional milestone.
+The implemented Phase 4.5 journey adds Quick endpoint onboarding and Full
+read-only-agent pairing before inspection. The broader journey through health
+monitoring, logs, plans, execution, receipts, lifecycle, backups, and upgrades
+remains in the roadmap, but is not the current implementation target. Producer
+mutation, VHP movement, Fogata, cloud provisioning, and any general-purpose or
+mutation-capable node agent remain outside this MVP.
 
 ## Implementation Progress
 
@@ -98,6 +101,16 @@ Implemented on `codex/cli-list-nodes`:
 - inspection unit, adapter-contract, deterministic fixture, redaction,
   batch/interactive parity, restart, typed-error, and compiled-CLI tests;
 - compiled CLI and unit/end-to-end command tests.
+- Quick Connect fixed-RPC endpoint policy, partial inspection, digest-reviewed
+  persistence, journal reconciliation, CLI/interactive commands, and compiled
+  validation;
+- Full Connect protocol and HTTPS client, deterministic fake agent, Ed25519
+  identity pinning, inspect-only secret-store credential, revocation,
+  Quick-to-Full stable-ID upgrade, and explicit access override;
+- thin context-isolated Electron Quick and Full workflows over typed IPC and
+  the same `NodeOnboardingApi`, including main-owned clipboard pairing import;
+- Electron accessibility and overflow validation, smoke execution, and
+  packaged-app validation.
 
 Phase 3 live adoption validation remains pending. Phase 4 live multiservice
 inspection passed after separate explicit approval for a strictly read-only
@@ -653,6 +666,30 @@ sanitized snapshot; deterministic and compiled gates pass.
 Continuous monitoring, fleet health, reachability diagnosis, logs,
 diagnostics, and support bundles are not part of this phase.
 
+### Phase 4.5 — Two-mode onboarding MVP (implemented; live and external gates pending)
+
+- Quick Connect accepts a compatible JSON-RPC endpoint and produces an
+  explicitly limited `NodeInspectionSnapshot` without requiring SSH.
+- Full Connect pairs a versioned authenticated read-only node agent and
+  produces the full inspection evidence supported by that runtime.
+- Quick-to-Full upgrade preserves the stable node ID and adds a stronger
+  private access binding rather than duplicating the node.
+- Existing exact-alias SSH inspection remains available as Expert Connect.
+- CLI, interactive CLI, Electron main, and a future controller call the same
+  onboarding and inspection core. The renderer never opens connections,
+  handles credentials, or parses CLI output.
+- Both modes remain read-only. Blank-host provisioning, automatic agent
+  installation, continuous monitoring, and lifecycle or chain mutation stay
+  outside the slice.
+
+Detailed phases, security gates, test matrices, and completion criteria are in
+`NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`.
+
+Exit: a Quick node can be saved and inspected with accurate limitations, then
+upgraded in place to a paired Full inspection connection without SSH, secret
+disclosure, runtime mutation, or node-ID change. Automated and separately
+approved live gates pass, or unavailable live validation remains explicit.
+
 ### Phase 5 — Durable plans and lifecycle
 
 - plan persistence, digest, expiry, review, confirmation, and invalidation;
@@ -731,9 +768,11 @@ Phases 0, 1, 1.5, and 2 are complete. Phase 3 deterministic implementation is
 complete; its live disposable-testnet adoption exit remains pending. Phase 4's
 shared contract, multiservice and Teleno adapters, CLI vertical, application
 API, deterministic tests, compiled validation, and separately approved live
-no-mutation audit are complete. The broader monitoring and lifecycle roadmap
-stays frozen until the completed MVP evidence is reviewed and a new target is
-explicitly selected.
+no-mutation audit are complete. Phase 4.5 Quick, Full, Expert compatibility,
+CLI/interactive, Electron, persistence, protocol, security, and deterministic
+validation are implemented. Approved live onboarding targets and a separately
+published production agent artifact remain pending. The broader monitoring and
+lifecycle roadmap remains frozen.
 
 ## 9. Amendment Summary — 2026-07-12
 
@@ -787,3 +826,13 @@ one sanitized snapshot through batch, interactive, and typed application API
 interfaces, and includes both runtime adapters. A later separately approved
 live run passed with matching pre/post component and configuration evidence.
 No runtime repository or managed runtime state was modified.
+
+## 11. Two-Mode Onboarding Selection — 2026-07-13
+
+Product review selected the next MVP slice: Quick Connect through fixed public
+RPC probes, and Full Connect through a paired authenticated read-only agent.
+SSH remains Expert Connect. The new slice is defined in
+`NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md` and is now implemented across the
+core, CLI, interactive CLI, and Electron onboarding surface. Live target and
+production agent artifact gates remain pending. The implementation does not
+unfreeze provisioning, monitoring, lifecycle, producer, or chain mutation.

@@ -39,6 +39,11 @@ export class FakeInteractiveTerminal implements InteractiveTerminal {
     return this.inputs.shift() ?? { kind: 'eof' }
   }
 
+  async readPrivateLine(prompt: string, _hidden: boolean): Promise<TerminalReadResult> {
+    this.prompts.push(prompt)
+    return this.inputs.shift() ?? { kind: 'eof' }
+  }
+
   write(text: string): void {
     this.output.push(text)
   }

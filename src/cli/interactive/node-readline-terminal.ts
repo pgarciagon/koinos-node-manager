@@ -81,6 +81,31 @@ export class NodeReadlineTerminal implements InteractiveTerminal {
     }
   }
 
+  async readPrivateLine(prompt: string, hidden: boolean): Promise<TerminalReadResult> {
+    if (this.#closed) return { kind: 'eof' }
+    const internal = this.#readline as unknown as {
+      history?: string[]
+      _writeToOutput?: (value: string) => void
+    }
+    const originalWrite = internal._writeToOutput
+    if (hidden && originalWrite !== undefined) {
+      internal._writeToOutput = (value: string) => {
+        if (value.includes(prompt) || value === '\r\n' || value === '\n') originalWrite.call(this.#readline, value)
+        else originalWrite.call(this.#readline, '*')
+      }
+    }
+    try {
+      const value = await this.#readline.question(prompt)
+      if (internal.history?.[0] === value) internal.history.shift()
+      return { kind: 'line', value }
+    } catch (error: unknown) {
+      if (this.#closed || isReadlineClosedError(error)) return { kind: 'eof' }
+      throw error
+    } finally {
+      if (hidden && originalWrite !== undefined) internal._writeToOutput = originalWrite
+    }
+  }
+
   write(text: string): void {
     this.#output.write(withNewline(text))
   }

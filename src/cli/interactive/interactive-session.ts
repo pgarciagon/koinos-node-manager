@@ -31,6 +31,7 @@ export type InteractiveSessionOptions = {
     connectionIds: readonly string[]
     discoveryIds: readonly string[]
     adoptionIds: readonly string[]
+    onboardingIds: readonly string[]
   }>
 }
 
@@ -50,6 +51,7 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
     connectionIds: () => phase3Ids.connectionIds,
     discoveryIds: () => phase3Ids.discoveryIds,
     adoptionIds: () => phase3Ids.adoptionIds,
+    onboardingIds: () => phase3Ids.onboardingIds,
     excludedCommandNames: ['interactive']
   }))
   options.terminal.write(renderInteractiveStartup(options.identity, state.inventorySource))
@@ -86,9 +88,11 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
         }
 
         state = reduceInteractiveSession(state, { type: 'command-started' })
+        const privateInputs = await collectPrivateInputs(tokens, options.terminal)
         const result = await options.executeCommand(tokens, {
           inventorySource: state.inventorySource,
-          terminalWidth: options.terminal.width
+          terminalWidth: options.terminal.width,
+          ...(privateInputs.length === 0 ? {} : { privateInputs })
         })
         if (result.stdout !== undefined) {
           const outputIndex = tokens.indexOf('--output')
@@ -120,9 +124,29 @@ export async function runInteractiveSession(options: InteractiveSessionOptions):
   }
 }
 
+async function collectPrivateInputs(tokens: readonly string[], terminal: InteractiveTerminal): Promise<readonly string[]> {
+  const inputs: string[] = []
+  for (const token of tokens) {
+    const prompt = token === '--rpc-endpoint-stdin'
+      ? { label: 'Private RPC endpoint: ', hidden: false }
+      : token === '--agent-endpoint-stdin'
+        ? { label: 'Private agent endpoint: ', hidden: false }
+        : token === '--pairing-secret-stdin'
+          ? { label: 'Pairing secret: ', hidden: true }
+          : undefined
+    if (prompt === undefined) continue
+    const value = await terminal.readPrivateLine(prompt.label, prompt.hidden)
+    if (value.kind !== 'line') throw new Error('Private input was cancelled.')
+    inputs.push(value.value)
+  }
+  return inputs
+}
+
 async function loadPhase3Ids(options: InteractiveSessionOptions, source: InventorySource) {
-  return options.phase3IdsForSource?.(source).catch(() => ({ connectionIds: [], discoveryIds: [], adoptionIds: [] }))
-    ?? { connectionIds: [], discoveryIds: [], adoptionIds: [] }
+  const loaded = await options.phase3IdsForSource?.(source).catch(() => undefined)
+  return loaded === undefined
+    ? { connectionIds: [], discoveryIds: [], adoptionIds: [], onboardingIds: [] }
+    : { ...loaded, onboardingIds: loaded.onboardingIds ?? [] }
 }
 
 type MetaCommandOutcome = {

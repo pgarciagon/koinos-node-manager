@@ -7,11 +7,11 @@ export type CommandOption = {
   syntax: string
   description: string
   values?: readonly string[]
-  completionSource?: 'node-id' | 'connection-id' | 'discovery-id' | 'adoption-id'
+  completionSource?: 'node-id' | 'connection-id' | 'discovery-id' | 'adoption-id' | 'onboarding-id'
 }
 
 export type CommandCompletion = {
-  positionalSources?: readonly ('node-id' | 'connection-id' | 'discovery-id' | 'adoption-id')[]
+  positionalSources?: readonly ('node-id' | 'connection-id' | 'discovery-id' | 'adoption-id' | 'onboarding-id')[]
 }
 
 export type CommandHandlerResult = string | {
@@ -27,6 +27,7 @@ export type CommandRuntime = {
   registry: CommandRegistry
   inventorySource: InventorySource
   terminalWidth?: number
+  takePrivateInput: (label: string) => string
 }
 
 export type CommandDefinition = {

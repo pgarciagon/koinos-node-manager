@@ -10,6 +10,7 @@ export type InteractiveCompletionOptions = {
   connectionIds?: () => readonly string[]
   discoveryIds?: () => readonly string[]
   adoptionIds?: () => readonly string[]
+  onboardingIds?: () => readonly string[]
   excludedCommandNames?: readonly string[]
 }
 
@@ -75,11 +76,12 @@ export function completeInteractiveLine(
   return [[], current]
 }
 
-function valuesForSource(source: 'node-id' | 'connection-id' | 'discovery-id' | 'adoption-id', options: InteractiveCompletionOptions): readonly string[] {
+function valuesForSource(source: 'node-id' | 'connection-id' | 'discovery-id' | 'adoption-id' | 'onboarding-id', options: InteractiveCompletionOptions): readonly string[] {
   if (source === 'node-id') return options.nodeIds()
   if (source === 'connection-id') return options.connectionIds?.() ?? []
   if (source === 'discovery-id') return options.discoveryIds?.() ?? []
-  return options.adoptionIds?.() ?? []
+  if (source === 'adoption-id') return options.adoptionIds?.() ?? []
+  return options.onboardingIds?.() ?? []
 }
 
 function findOption(definition: CommandDefinition, name: string) {

@@ -8,16 +8,24 @@ import {
   type ConnectionStateDiagnosticCheck,
   type ConnectionStateDiagnosticReport,
   type ConnectionStateRepository,
-  type ConnectionStateSnapshot
+  type ConnectionStateSnapshot,
+  type ConnectionStateWrite
 } from '../../core/connection-state-repository.js'
 import { EXIT_CODES } from '../../core/exit-codes.js'
 import { assertValidConnectionState, validateConnectionState } from '../../core/validate-connection-state.js'
 import type { AdoptionReview, ConnectionRecord, DiscoveryRecord } from '../../domain/connection.js'
+import type { NodeAccessProfile, OnboardingReviewRecord } from '../../domain/onboarding.js'
 import type { InventoryPaths } from './inventory-paths.js'
 
 type Decoded =
   | { kind: 'current'; snapshot: ConnectionStateSnapshot }
-  | { kind: 'legacy'; revision: number; connections: readonly ConnectionRecord[]; discoveries: readonly DiscoveryRecord[] }
+  | {
+      kind: 'legacy'
+      revision: number
+      connections: readonly ConnectionRecord[]
+      discoveries: readonly DiscoveryRecord[]
+      adoptionReviews: readonly AdoptionReview[]
+    }
   | { kind: 'invalid'; reason: 'syntax' | 'schema' | 'records' }
 
 export type FileSystemConnectionStateOptions = {
@@ -52,11 +60,7 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
     }
   }
 
-  async save(
-    state: Pick<ConnectionStateSnapshot, 'connections' | 'discoveries' | 'adoptionReviews'>,
-    expectedRevision: number
-  ): Promise<ConnectionStateSnapshot> {
-    assertValidConnectionState(state)
+  async save(state: ConnectionStateWrite, expectedRevision: number): Promise<ConnectionStateSnapshot> {
     return this.#withLock(async () => {
       const current = await this.#loadLocked()
       if (current.revision !== expectedRevision) {
@@ -69,6 +73,9 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
           nextAction: 'Inspect the latest state and repeat the operation.'
         })
       }
+      const accessProfiles = state.accessProfiles ?? current.accessProfiles
+      const onboardingReviews = state.onboardingReviews ?? current.onboardingReviews
+      assertValidConnectionState({ ...state, accessProfiles, onboardingReviews })
       if (current.updatedAt !== null) await this.#backup(current.revision, 'write')
       const snapshot: ConnectionStateSnapshot = {
         schemaVersion: CONNECTION_STATE_SCHEMA_VERSION,
@@ -76,7 +83,9 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
         updatedAt: this.#now().toISOString(),
         connections: structuredClone(state.connections),
         discoveries: structuredClone(state.discoveries),
-        adoptionReviews: structuredClone(state.adoptionReviews)
+        adoptionReviews: structuredClone(state.adoptionReviews),
+        accessProfiles: structuredClone(accessProfiles),
+        onboardingReviews: structuredClone(onboardingReviews)
       }
       await this.#atomicWrite(snapshot)
       await this.#pruneBackups()
@@ -96,7 +105,7 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
           ? { id: 'connection-state-file', status: 'fail', summary: 'Connection state is corrupt, unsafe, or uses an unsupported schema.', nextAction: 'Run a connection query to quarantine it, then use "knm doctor --recover-connection-state" if a valid backup exists.' }
           : decoded.kind === 'legacy'
             ? { id: 'connection-state-file', status: 'warning', summary: 'Supported legacy connection state is ready for backup and migration.', nextAction: 'Run "knm connections list" to migrate it.' }
-            : { id: 'connection-state-file', status: 'pass', summary: `Connection state schema ${decoded.snapshot.schemaVersion}, revision ${decoded.snapshot.revision}, ${decoded.snapshot.connections.length} connection${decoded.snapshot.connections.length === 1 ? '' : 's'}, ${decoded.snapshot.discoveries.length} discover${decoded.snapshot.discoveries.length === 1 ? 'y' : 'ies'}, and ${decoded.snapshot.adoptionReviews.length} adoption review${decoded.snapshot.adoptionReviews.length === 1 ? '' : 's'} are valid.` })
+            : { id: 'connection-state-file', status: 'pass', summary: `Connection state schema ${decoded.snapshot.schemaVersion}, revision ${decoded.snapshot.revision}, ${decoded.snapshot.connections.length} connection${decoded.snapshot.connections.length === 1 ? '' : 's'}, ${decoded.snapshot.accessProfiles.length} access profile${decoded.snapshot.accessProfiles.length === 1 ? '' : 's'}, ${decoded.snapshot.onboardingReviews.length} onboarding review${decoded.snapshot.onboardingReviews.length === 1 ? '' : 's'}, ${decoded.snapshot.discoveries.length} discover${decoded.snapshot.discoveries.length === 1 ? 'y' : 'ies'}, and ${decoded.snapshot.adoptionReviews.length} adoption review${decoded.snapshot.adoptionReviews.length === 1 ? '' : 's'} are valid.` })
         const mode = (await stat(this.paths.connectionStateFile)).mode
         checks.push((mode & 0o077) === 0
           ? { id: 'connection-state-permissions', status: 'pass', summary: 'The connection state file is private to the current user.' }
@@ -152,7 +161,9 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
               updatedAt: this.#now().toISOString(),
               connections: structuredClone(decoded.connections),
               discoveries: structuredClone(decoded.discoveries),
-              adoptionReviews: []
+              adoptionReviews: structuredClone(decoded.adoptionReviews),
+              accessProfiles: legacyAccessProfiles(decoded.connections),
+              onboardingReviews: []
             }
         await this.#atomicWrite(recovered)
         return recovered
@@ -185,7 +196,9 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
         updatedAt: this.#now().toISOString(),
         connections: structuredClone(decoded.connections),
         discoveries: structuredClone(decoded.discoveries),
-        adoptionReviews: []
+        adoptionReviews: structuredClone(decoded.adoptionReviews),
+        accessProfiles: legacyAccessProfiles(decoded.connections),
+        onboardingReviews: []
       }
       await this.#atomicWrite(migrated)
       return migrated
@@ -208,7 +221,9 @@ export class FileSystemConnectionStateRepository implements ConnectionStateRepos
       updatedAt: this.#now().toISOString(),
       connections: structuredClone(decoded.connections),
       discoveries: structuredClone(decoded.discoveries),
-      adoptionReviews: []
+      adoptionReviews: structuredClone(decoded.adoptionReviews),
+      accessProfiles: legacyAccessProfiles(decoded.connections),
+      onboardingReviews: []
     }
     await this.#atomicWrite(migrated)
     return migrated
@@ -358,9 +373,17 @@ function decode(raw: string): Decoded {
   }
   if (!isObject(value) || !Array.isArray(value.connections) || !Array.isArray(value.discoveries)) return { kind: 'invalid', reason: 'schema' }
   const adoptionReviews = Array.isArray(value.adoptionReviews) ? value.adoptionReviews : []
-  if (validateConnectionState({ connections: value.connections, discoveries: value.discoveries, adoptionReviews }).length > 0) return { kind: 'invalid', reason: 'records' }
+  const accessProfiles = Array.isArray(value.accessProfiles) ? value.accessProfiles : []
+  const onboardingReviews = Array.isArray(value.onboardingReviews) ? value.onboardingReviews : []
+  if (validateConnectionState({
+    connections: value.connections,
+    discoveries: value.discoveries,
+    adoptionReviews,
+    accessProfiles,
+    onboardingReviews
+  }).length > 0) return { kind: 'invalid', reason: 'records' }
   if (value.schemaVersion === CONNECTION_STATE_SCHEMA_VERSION
-    && hasKeys(value, ['schemaVersion', 'revision', 'updatedAt', 'connections', 'discoveries', 'adoptionReviews'])
+    && hasKeys(value, ['schemaVersion', 'revision', 'updatedAt', 'connections', 'discoveries', 'adoptionReviews', 'accessProfiles', 'onboardingReviews'])
     && validEnvelope(value)) {
     return {
       kind: 'current',
@@ -370,21 +393,30 @@ function decode(raw: string): Decoded {
         updatedAt: value.updatedAt as string | null,
         connections: structuredClone(value.connections as ConnectionRecord[]),
         discoveries: structuredClone(value.discoveries as DiscoveryRecord[]),
-        adoptionReviews: structuredClone(value.adoptionReviews as AdoptionReview[])
+        adoptionReviews: structuredClone(value.adoptionReviews as AdoptionReview[]),
+        accessProfiles: structuredClone(value.accessProfiles as NodeAccessProfile[]),
+        onboardingReviews: structuredClone(value.onboardingReviews as OnboardingReviewRecord[])
       }
     }
   }
-  if (value.schemaVersion === 0
-    && hasKeys(value, ['schemaVersion', 'revision', 'connections', 'discoveries'])
+  if ((value.schemaVersion === 0 || value.schemaVersion === 1)
+    && (value.schemaVersion === 0
+      ? hasKeys(value, ['schemaVersion', 'revision', 'connections', 'discoveries'])
+      : hasKeys(value, ['schemaVersion', 'revision', 'updatedAt', 'connections', 'discoveries', 'adoptionReviews']))
     && Number.isSafeInteger(value.revision) && Number(value.revision) >= 0) {
     return {
       kind: 'legacy',
       revision: Number(value.revision),
       connections: structuredClone(value.connections as ConnectionRecord[]),
-      discoveries: structuredClone(value.discoveries as DiscoveryRecord[])
+      discoveries: structuredClone(value.discoveries as DiscoveryRecord[]),
+      adoptionReviews: structuredClone(adoptionReviews as AdoptionReview[])
     }
   }
   return { kind: 'invalid', reason: 'schema' }
+}
+
+function legacyAccessProfiles(_connections: readonly ConnectionRecord[]): readonly NodeAccessProfile[] {
+  return []
 }
 
 function validEnvelope(value: Record<string, unknown>): boolean {

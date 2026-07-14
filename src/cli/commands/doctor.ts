@@ -39,6 +39,9 @@ export async function runDoctor(args: readonly string[], context: ApplicationCon
     : undefined
   const inventory = await repository.diagnose()
   const connectionState = await connectionRepository.diagnose()
+  const onboardingJournal = context.onboardingJournalRepository == null
+    ? { status: 'fail' as const, summary: 'The onboarding journal adapter is unavailable.' }
+    : await context.onboardingJournalRepository.diagnose()
   const runtimeCheck: InventoryDiagnosticCheck = process.versions.node.split('.')[0] !== undefined
     && Number(process.versions.node.split('.')[0]) >= 22
     ? { id: 'node-runtime', status: 'pass', summary: `Node.js ${process.versions.node} satisfies the supported runtime.` }
@@ -66,7 +69,31 @@ export async function runDoctor(args: readonly string[], context: ApplicationCon
     : missingDiscoverySources.length === 0
       ? { id: 'discovery-source-integrity', status: 'pass', summary: 'All persisted peer evidence resolves to an inventory source node.' }
     : { id: 'discovery-source-integrity', status: 'fail', summary: `${missingDiscoverySources.length} peer discovery source${missingDiscoverySources.length === 1 ? '' : 's'} no longer resolve to inventory nodes.`, nextAction: 'Dismiss orphaned peer evidence or restore the source inventory metadata.' }
-  const aliasChecks = await Promise.all(connections.map(async (connection): Promise<InventoryDiagnosticCheck> =>
+  const orphanedProfiles = (persistedConnectionState?.accessProfiles ?? []).filter((profile) => !nodeIds.has(profile.nodeId))
+  const accessProfileCheck: InventoryDiagnosticCheck = !inventoryReadable || persistedConnectionState === null
+    ? { id: 'onboarding-access-profiles', status: 'warning', summary: 'Onboarding access profiles were not cross-checked because active local state is not safely readable.', nextAction: 'Repair or recover local state, then run doctor again.' }
+    : orphanedProfiles.length === 0
+      ? { id: 'onboarding-access-profiles', status: 'pass', summary: 'All onboarding access profiles resolve to inventory nodes and private connection records.' }
+      : { id: 'onboarding-access-profiles', status: 'fail', summary: `${orphanedProfiles.length} onboarding access profile${orphanedProfiles.length === 1 ? '' : 's'} no longer resolves to an inventory node.`, nextAction: 'Restore the node or remove the orphaned private access profile.' }
+  const journalCheck: InventoryDiagnosticCheck = {
+    id: 'onboarding-journal',
+    status: onboardingJournal.status,
+    summary: onboardingJournal.summary,
+    ...(onboardingJournal.nextAction === undefined ? {} : { nextAction: onboardingJournal.nextAction })
+  }
+  const agentConnections = connections.filter((connection) => connection.kind === 'agent')
+  const secretStoreAvailable = agentConnections.length === 0 ? true : await context.secretStore.available()
+  const missingCredentials = secretStoreAvailable
+    ? (await Promise.all(agentConnections.map(async (connection) => await context.secretStore.get(connection.credentialRef) === null))).filter(Boolean).length
+    : agentConnections.length
+  const secretReferenceCheck: InventoryDiagnosticCheck = agentConnections.length === 0
+    ? { id: 'onboarding-secret-references', status: 'pass', summary: 'No paired-agent credential references require a local secret-store check.' }
+    : !secretStoreAvailable
+      ? { id: 'onboarding-secret-references', status: 'fail', summary: 'The operating-system secret store is unavailable for paired-agent references.', nextAction: 'Unlock or configure the local secret store, then run doctor again.' }
+      : missingCredentials === 0
+        ? { id: 'onboarding-secret-references', status: 'pass', summary: 'All paired-agent credential references resolve in the operating-system secret store.' }
+        : { id: 'onboarding-secret-references', status: 'fail', summary: `${missingCredentials} paired-agent credential reference${missingCredentials === 1 ? '' : 's'} cannot be resolved.`, nextAction: 'Re-pair the affected read-only agent or remove its stale private access binding.' }
+  const aliasChecks = await Promise.all(connections.filter((connection) => connection.kind === 'ssh').map(async (connection): Promise<InventoryDiagnosticCheck> =>
     await context.aliasResolver.hasExactAlias(connection.hostAlias)
       ? { id: `connection-alias:${connection.id}`, status: 'pass', summary: 'The connection resolves to an exact private SSH-config alias.' }
       : { id: `connection-alias:${connection.id}`, status: 'fail', summary: 'The connection no longer resolves to an exact private SSH-config alias.', nextAction: 'Restore the private alias or remove the stale connection reference.' }
@@ -76,7 +103,7 @@ export async function runDoctor(args: readonly string[], context: ApplicationCon
       ? [{ id: 'remote-connection-probes', status: 'fail' as const, summary: 'Remote probes were not run because connection state is not safely readable.', nextAction: 'Repair or recover connection state before retrying explicit remote checks.' }]
       : await runRemoteChecks(context, connections.map((connection) => connection.id))
     : [{ id: 'remote-connection-probes', status: 'pass' as const, summary: 'Remote hosts were not contacted; use --check-connections for explicit bounded probes.' }]
-  const checks = [runtimeCheck, ...inventory.checks, ...connectionState.checks, referenceCheck, discoverySourceCheck, ...aliasChecks, ...remoteChecks]
+  const checks = [runtimeCheck, ...inventory.checks, ...connectionState.checks, referenceCheck, discoverySourceCheck, accessProfileCheck, journalCheck, secretReferenceCheck, ...aliasChecks, ...remoteChecks]
   const healthy = checks.every((check) => check.status !== 'fail')
   const data = {
     healthy,
@@ -108,6 +135,25 @@ async function runRemoteChecks(context: ApplicationContext, connectionIds: reado
   if (repository === null) return []
   const checks: InventoryDiagnosticCheck[] = []
   for (const connectionId of connectionIds) {
+    const initial = (await repository.read()).connections.find((candidate) => candidate.id === connectionId)
+    if (initial === undefined) continue
+    if (initial.kind !== 'ssh') {
+      try {
+        const kind = initial.kind === 'public-rpc'
+          ? 'node.multiservice.chain-id' as const
+          : initial.runtimeFlavor === 'teleno-monolith'
+            ? 'node.teleno.status' as const
+            : 'node.multiservice.chain-id' as const
+        const transport = initial.kind === 'public-rpc' ? context.publicRpcTransport : context.agentProbeTransport
+        const result = await transport.execute({ connection: initial, kind, timeoutMs: 10_000 })
+        checks.push(result.outcome === 'success'
+          ? { id: `remote-connection:${connectionId}`, status: 'pass', summary: 'The explicit bounded read-only connection probe succeeded.' }
+          : { id: `remote-connection:${connectionId}`, status: 'fail', summary: `The explicit bounded read-only connection probe returned ${result.outcome}.`, nextAction: 'Review the private connection and its read-only capability without exposing coordinates.' })
+      } catch {
+        checks.push({ id: `remote-connection:${connectionId}`, status: 'fail', summary: 'The explicit bounded read-only connection probe failed safely.', nextAction: 'Review the private connection, credential, endpoint policy, and compatibility.' })
+      }
+      continue
+    }
     try {
       await testConnection({ repository, aliasResolver: context.aliasResolver, probeTransport: context.probeTransport }, connectionId, 10_000)
     } catch (error: unknown) {

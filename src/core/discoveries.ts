@@ -128,6 +128,16 @@ function discoveryId(kind: string, source: string, capturedAt: string, payload: 
 
 async function configuredConnection(services: DiscoveryServices, connectionId: string) {
   const connection = await getConnection(services.repository, connectionId)
+  if (connection.kind !== 'ssh') {
+    throw new ApplicationError({
+      code: 'DISCOVERY_CONNECTION_UNSUPPORTED',
+      exitCode: EXIT_CODES.transportUnavailable,
+      severity: 'error',
+      retryable: false,
+      message: 'Host and peer discovery currently require an Expert SSH connection.',
+      nextAction: 'Use an exact SSH connection for discovery or inspect the node through onboarding.'
+    })
+  }
   if (!await services.aliasResolver.hasExactAlias(connection.hostAlias)) {
     throw new ApplicationError({
       code: 'SSH_ALIAS_NOT_CONFIGURED',

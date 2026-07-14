@@ -1,6 +1,6 @@
 # CLI Architecture
 
-Last updated: 2026-07-13
+Last updated: 2026-07-14
 
 ## Executable Verticals
 
@@ -42,8 +42,40 @@ FileSystemInventoryRepository / SimulatedNodeRepository adapters
 - `src/cli/help.ts` derives top-level, resource, and command help from the same
   registry metadata used for execution.
 
-Electron main will call the same core use case directly. It must not parse the
-human CLI table or use the CLI process as its primary integration mechanism.
+Electron main calls the same onboarding and inspection core APIs directly. It
+does not parse the human CLI table or use the CLI process as its integration
+mechanism.
+
+## Implemented Desktop Read Surface
+
+The desktop product is a peer adapter over the same functional core:
+
+```text
+sandboxed renderer
+      |
+versioned preload: nodes.list() / nodes.inspect(nodeId)
+      |
+Electron main: validation, access selection, timeout, error conversion
+      |
+PublicNodeDirectory 1.0.0 / NodeInspectionApi 1.0.0
+      |
+inventory, access, runtime adapters, and sanitization core
+```
+
+`src/core/node-directory-api.ts` derives display-sorted public summaries from
+validated inventory and access state. It returns only stable ID, display name,
+resolved network and runtime flavor, and available/preferred access modes.
+Electron main first confirms that an inspect target exists in that public
+directory and then requests all four inspection sections with a bounded
+timeout. Unknown IPC arguments and malformed node IDs become stable public
+errors.
+
+The preload exposes only the onboarding bridge and the two node-read methods.
+The renderer uses text nodes, explicit directory/detail reducers, semantic
+buttons and tabs, and no timers or background polling. A failed Refresh retains
+the previous public snapshot and marks it stale. Context isolation, sandboxing,
+disabled Node integration, and `connect-src 'none'` keep transports, files,
+processes, and secrets outside the renderer.
 
 ## Runtime Inspection Compatibility Layer
 
@@ -122,6 +154,53 @@ small versioned fact format and never raw configuration; JSON-RPC probes use
 fixed local methods. Neither the application API nor an adapter accepts command
 text.
 
+## Implemented Two-Mode Onboarding Boundary
+
+The implemented MVP adds two simple onboarding paths without changing the
+inspection contract or making SSH a presentation concern:
+
+```text
+batch CLI / interactive CLI / Electron main / future controller
+                              |
+                       NodeOnboardingApi
+                              |
+       onboarding review, digest, and atomic commit core
+                              |
+             NodeInspectionSnapshot normalization
+                 /             |             \
+       Public RPC probe   paired agent   existing SSH probe
+        Quick Connect     Full Connect    Expert Connect
+```
+
+Quick Connect uses fixed bounded Koinos JSON-RPC probes and produces an
+explicitly partial snapshot. Full Connect uses a versioned authenticated
+read-only agent with a closed probe catalog. Expert Connect preserves the
+implemented exact-alias SSH path. A Quick-to-Full transition adds a stronger
+private access binding to the same stable node; it does not create a duplicate
+inventory identity.
+
+Private endpoints and agent credentials stay behind application ports.
+Credentials use an operating-system secret store through opaque references.
+Electron main owns endpoint policy, network clients, pairing, persistence, and
+sanitization. The renderer receives only versioned public reviews, progress,
+capability summaries, and inspection DTOs; it never opens sockets, handles
+secrets, invokes SSH, or parses CLI output.
+
+`NodeOnboardingApi` is versioned and UI-neutral. Quick and Full reviews bind
+connection and inventory revisions, evidence, expiry, identity, and digest.
+`FileSystemOnboardingJournalRepository` makes connection, access-profile, and
+inventory commits interruption-recoverable. Private endpoints remain only in
+connection state; credentials remain only in the operating-system secret
+store. The deterministic fake secret store and fake agent exercise restart,
+replay, expiry, revocation, and failure paths.
+
+Electron main imports Full pairing payloads explicitly from the clipboard,
+clears it, keeps the single-use secret only in memory, and returns public DTOs.
+The sandboxed context-isolated renderer has no socket, SSH, Docker, process,
+secret-store, or CLI parsing surface. The authoritative protocol and operator
+flow are in `protocols/KOINOS_NODE_AGENT_PROTOCOL.md` and
+`guides/NODE_ONBOARDING_GUIDE.md`.
+
 ## Connection, Probe, Discovery, And Adoption Core
 
 Phase 3 adds peer adapters over reusable ports rather than placing SSH or
@@ -139,7 +218,7 @@ atomic filesystem state / SSH adapter / deterministic fake adapters
 Teleno discovery interpreter
 ```
 
-`connection-state.json` uses schema `1` independently of inventory schema and
+`connection-state.json` uses schema `2` independently of inventory schema and
 the schema v2 CLI envelope. It stores private exact SSH aliases, sanitized
 connection-test evidence, host and peer discovery evidence, and immutable
 adoption reviews. It uses private permissions, synchronized atomic
@@ -290,6 +369,9 @@ knm connections list|show|add ssh|test|remove
 knm discover host|peers
 knm discoveries list|show|dismiss
 knm nodes adoption inspect|plan|apply|list
+knm onboarding quick preview|apply
+knm onboarding full preview|pair|apply|revoke
+knm onboarding status|cancel|reconcile
 ```
 
 The JSON response uses envelope schema version `2`. Version 2 introduced the
@@ -355,11 +437,12 @@ immediately with `INTERACTIVE_TTY_REQUIRED` and exit code `2`.
 
 ## Next Steps
 
-1. Review the completed deterministic and separately approved live inspection
-   evidence before unfreezing any broader fleet scope.
-2. Review the explicit runtime evidence gaps and, only where justified, propose
-   the smallest versioned read-only additions in the owning runtime repository.
-3. Build a thin Electron-main bridge and read-only dashboard over
-   `NodeInspectionApi`; do not add runtime-specific renderer logic.
-4. Keep Phase 3 live adoption validation recorded as pending; it is independent
-   of this inspection-only MVP and must not be claimed as passed.
+1. Obtain separate authorization before creating or publishing a production
+   reference-agent repository or artifact.
+2. Obtain separate target approval for Quick and Full live no-mutation,
+   restart, semantic-parity, and credential-revocation validation.
+3. Keep Phase 3 live adoption validation recorded as pending; it is independent
+   of onboarding and must not be claimed as passed.
+4. Keep continuous monitoring, lifecycle, backup, upgrade, producer, wallet,
+   signing, and transaction work frozen until a later phase is explicitly
+   reopened.

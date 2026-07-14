@@ -13,8 +13,8 @@ export async function runConnectionsList(args: readonly string[], context: Appli
   if (output === 'json') return successEnvelope('connections.list', { total: connections.length, connections: connections.map(sanitizeConnection) })
   if (connections.length === 0) return 'No connection references are configured.'
   return [
-    'ID                       KIND  ALIAS          LAST TEST',
-    ...connections.map((connection) => `${connection.id.padEnd(24)} ${connection.kind.padEnd(5)} configured     ${connection.lastTest?.outcome ?? 'never'}`),
+    'ID                       KIND        PRIVATE DATA  LAST TEST',
+    ...connections.map((connection) => `${connection.id.padEnd(24)} ${connection.kind.padEnd(11)} configured  ${connection.lastTest?.outcome ?? 'never'}`),
     '',
     `${connections.length} connection${connections.length === 1 ? '' : 's'}`
   ].join('\n')
@@ -30,7 +30,7 @@ export async function runConnectionsShow(args: readonly string[], context: Appli
   return [
     `Connection ${connection.id}`,
     `  Kind:             ${connection.kind}`,
-    '  SSH alias:        configured (value redacted)',
+    '  Private access:   configured (coordinates redacted)',
     `  Created:          ${connection.createdAt}`,
     `  Updated:          ${connection.updatedAt}`,
     `  Last test:        ${connection.lastTest === null ? 'never' : `${connection.lastTest.outcome} at ${connection.lastTest.testedAt} (${connection.lastTest.durationMs} ms)`}`

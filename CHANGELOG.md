@@ -6,6 +6,44 @@ All notable changes to Koinos Node Manager will be documented in this file.
 
 ### Added
 
+- Node Inspection Desktop MVP with a sanitized persisted node directory,
+  responsive Nodes and empty states, and read-only Node Detail sections for
+  Overview, Components, Chain, and Governance.
+- Versioned `PublicNodeDirectory 1.0.0`, deterministic core-owned summary
+  derivation and ordering, and a narrow Electron `nodes.list()` /
+  `nodes.inspect(nodeId)` bridge over the existing inspection API.
+- Explicit deduplicated Refresh with previous-snapshot retention and stale
+  marking on failure, plus direct Quick and Full onboarding handoff to the same
+  stable node.
+- Deterministic browser fixtures isolated from production packages, an
+  eight-state responsive screenshot matrix, Electron IPC and renderer-boundary
+  tests, and packaged desktop validation.
+- Two-mode existing-node onboarding across the functional core, batch and
+  interactive CLI, and a thin Electron application: endpoint-only Quick
+  Connect, authenticated read-only-agent Full Connect, and preserved
+  exact-alias SSH Expert Connect.
+- Versioned private public-RPC and agent connection records, multiple access
+  bindings per stable node, deterministic Full/Expert/Quick selection, and
+  Quick-to-Full in-place upgrade without duplicate inventory records.
+- Digest- and revision-bound onboarding reviews, a private cross-repository
+  commit journal, deterministic interruption reconciliation, cancellation,
+  status, doctor checks, and operating-system secret-store references.
+- SSRF-resistant fixed Koinos RPC transport with reviewed private destinations,
+  pinned DNS resolution, no redirects, bounded concurrency, time, bytes, and
+  JSON depth, plus an explicitly partial public-RPC inspection adapter.
+- `KoinosNodeAgentProtocol 1.0.0`, deterministic fake agent, fixed HTTPS client,
+  Ed25519 identity pinning and possession proof, signed build statements,
+  short-lived single-use pairing, inspect-only revocable credentials, and a
+  closed typed probe catalog with no arbitrary command or RPC surface.
+- `onboarding quick preview|apply`, `onboarding full preview|pair|apply|revoke`,
+  `onboarding status|cancel|reconcile`, private stdin and hidden interactive
+  input, access override for `nodes inspect`, registry help, and completion.
+- Electron Quick and Full onboarding workflows over the same core, typed IPC,
+  main-owned clipboard pairing import, context isolation, renderer isolation,
+  accessible states, responsive layout, smoke validation, and packaged-app
+  validation.
+- Onboarding ADR, threat model, agent protocol, operator guide, Electron
+  boundary documentation, and a requirement-by-requirement completion audit.
 - CLI-first TypeScript project, compiled `knm` binary, and strict test setup.
 - Compositional node model for managed, connected, external, and discovered
   nodes with separate declared, desired, observed, and verified state.

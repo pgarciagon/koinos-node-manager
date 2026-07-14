@@ -4,6 +4,7 @@
   "private": true,
   "description": "CLI-first fleet manager for Koinos nodes",
   "type": "module",
+  "main": "./dist/electron/main.js",
   "bin": {
     "knm": "./dist/cli/main.js"
   },
@@ -13,18 +14,26 @@
   ],
   "scripts": {
     "build:identity": "node scripts/generate-build-identity.mjs",
-    "build": "npm run --silent build:identity && tsc -p tsconfig.json",
+    "build": "npm run --silent build:identity && tsc -p tsconfig.json && node scripts/copy-electron-assets.mjs",
     "check": "npm run --silent build:identity && tsc -p tsconfig.json --noEmit",
     "cli": "npm run --silent build:identity && tsx src/cli/main.ts",
     "test": "npm run --silent build:identity && tsx --test tests/**/*.test.ts",
     "test:compiled": "npm run --silent build && node scripts/test-compiled-cli.mjs",
-    "verify": "npm run check && npm test && npm run test:compiled"
+    "test:electron": "npm run --silent build && electron dist/electron/main.js --smoke-test",
+    "desktop": "npm run --silent build && electron dist/electron/main.js",
+    "ui:review:prepare": "npm run --silent build && node scripts/generate-electron-ui-fixtures.mjs",
+    "package:electron": "npm run --silent build && electron-packager . \"Koinos Node Manager\" --out=.artifacts/electron --overwrite --prune=true --ignore=^/.artifacts --ignore=^/tests --ignore=^/docs --ignore=^/assets --ignore=^/scripts/generate-electron-ui-fixtures\\.mjs$",
+    "test:electron:packaged": "npm run --silent package:electron && node scripts/test-packaged-electron.mjs",
+    "verify": "npm run check && npm test && npm run test:compiled && npm run test:electron"
   },
   "engines": {
     "node": ">=22"
   },
   "devDependencies": {
+    "@electron/packager": "^20.0.2",
     "@types/node": "^24.0.0",
+    "electron": "^43.1.0",
+    "esbuild": "^0.28.1",
     "tsx": "^4.20.0",
     "typescript": "^5.8.0"
   }

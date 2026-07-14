@@ -6,10 +6,18 @@ import { SshConfigAliasResolver } from '../adapters/ssh/ssh-config-alias-resolve
 import { SshReadOnlyProbeTransport } from '../adapters/ssh/ssh-read-only-probe-transport.js'
 import { LegacyMultiserviceInspectionAdapter } from '../adapters/inspection/legacy-multiservice-inspection-adapter.js'
 import { TelenoInspectionAdapter } from '../adapters/inspection/teleno-inspection-adapter.js'
+import { PublicKoinosRpcInspectionAdapter } from '../adapters/inspection/public-koinos-rpc-inspection-adapter.js'
+import { PublicRpcReadOnlyProbeTransport } from '../adapters/rpc/public-rpc-read-only-probe-transport.js'
+import { FileSystemOnboardingJournalRepository } from '../adapters/filesystem/file-system-onboarding-journal-repository.js'
+import { HttpsAgentClient } from '../adapters/agent/https-agent-client.js'
+import { AgentReadOnlyProbeTransport } from '../adapters/agent/agent-read-only-probe-transport.js'
+import { OperatingSystemSecretStore, type SecretStore } from '../core/secret-store.js'
+import type { AgentClient } from '../core/agent-client.js'
 import type { ConnectionStateRepository } from '../core/connection-state-repository.js'
 import type { InventoryRepository, NodeRepository } from '../core/node-repository.js'
 import type { ReadOnlyProbeTransport, SshAliasResolver } from '../core/probe-transport.js'
 import type { RuntimeInspectionAdapter } from '../core/runtime-inspection-adapter.js'
+import type { OnboardingJournalRepository } from '../core/onboarding-journal.js'
 
 export type InventorySource =
   | { kind: 'local' }
@@ -24,6 +32,12 @@ export type ApplicationContext = {
   aliasResolver: SshAliasResolver
   probeTransport: ReadOnlyProbeTransport
   inspectionAdapters: readonly RuntimeInspectionAdapter[]
+  publicRpcTransport: ReadOnlyProbeTransport
+  publicRpcAdapter: RuntimeInspectionAdapter
+  onboardingJournalRepository: OnboardingJournalRepository | null
+  agentClient: AgentClient
+  agentProbeTransport: ReadOnlyProbeTransport
+  secretStore: SecretStore
   now?: () => Date
   inventorySource: InventorySource
   paths: InventoryPaths
@@ -39,6 +53,11 @@ export function createApplicationContext(inventorySource: InventorySource): Appl
     new LegacyMultiserviceInspectionAdapter(),
     new TelenoInspectionAdapter()
   ]
+  const publicRpcTransport = new PublicRpcReadOnlyProbeTransport({ allowLoopbackHttp: process.env.KNM_ALLOW_LOOPBACK_HTTP === '1' })
+  const publicRpcAdapter = new PublicKoinosRpcInspectionAdapter()
+  const secretStore = new OperatingSystemSecretStore()
+  const agentClient = new HttpsAgentClient({ allowLoopbackHttp: process.env.KNM_ALLOW_LOOPBACK_HTTP === '1' })
+  const agentProbeTransport = new AgentReadOnlyProbeTransport(agentClient, secretStore)
   if (inventorySource.kind === 'simulation') {
     return {
       nodeRepository: SimulatedNodeRepository.forScenario(inventorySource.scenario),
@@ -47,12 +66,19 @@ export function createApplicationContext(inventorySource: InventorySource): Appl
       aliasResolver,
       probeTransport,
       inspectionAdapters,
+      publicRpcTransport,
+      publicRpcAdapter,
+      onboardingJournalRepository: null,
+      agentClient,
+      agentProbeTransport,
+      secretStore,
       inventorySource: structuredClone(inventorySource),
       paths
     }
   }
   const repository = new FileSystemInventoryRepository(paths)
   const connectionStateRepository = new FileSystemConnectionStateRepository(paths)
+  const onboardingJournalRepository = new FileSystemOnboardingJournalRepository(paths)
   return {
     nodeRepository: repository,
     inventoryRepository: repository,
@@ -60,6 +86,12 @@ export function createApplicationContext(inventorySource: InventorySource): Appl
     aliasResolver,
     probeTransport,
     inspectionAdapters,
+    publicRpcTransport,
+    publicRpcAdapter,
+    onboardingJournalRepository,
+    agentClient,
+    agentProbeTransport,
+    secretStore,
     inventorySource: structuredClone(inventorySource),
     paths
   }

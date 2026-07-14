@@ -9,7 +9,7 @@ import type {
   EndpointScope
 } from './node.js'
 
-export const CONNECTION_KINDS = ['ssh'] as const
+export const CONNECTION_KINDS = ['ssh', 'public-rpc', 'agent'] as const
 export type ConnectionKind = (typeof CONNECTION_KINDS)[number]
 
 export const CONNECTION_TEST_OUTCOMES = [
@@ -28,14 +28,39 @@ export type ConnectionTestEvidence = {
   durationMs: number
 }
 
-export type ConnectionRecord = {
+export type BaseConnectionRecord = {
   id: string
-  kind: ConnectionKind
-  hostAlias: string
   createdAt: string
   updatedAt: string
   lastTest: ConnectionTestEvidence | null
 }
+
+export type SshConnectionRecord = BaseConnectionRecord & {
+  kind: 'ssh'
+  hostAlias: string
+}
+
+export type PublicRpcConnectionRecord = BaseConnectionRecord & {
+  kind: 'public-rpc'
+  endpoint: string
+  endpointPolicy: 'https-public' | 'https-private-reviewed' | 'http-loopback-development'
+}
+
+export const AGENT_SCOPES = ['inspect'] as const
+export type AgentScope = (typeof AGENT_SCOPES)[number]
+
+export type AgentConnectionRecord = BaseConnectionRecord & {
+  kind: 'agent'
+  endpoint: string
+  endpointPolicy: 'https-public' | 'https-private-reviewed' | 'http-loopback-development'
+  pinnedAgentIdentityDigest: string
+  credentialRef: string
+  protocolVersion: string
+  runtimeFlavor: NodeFlavor['id']
+  scopes: readonly AgentScope[]
+}
+
+export type ConnectionRecord = SshConnectionRecord | PublicRpcConnectionRecord | AgentConnectionRecord
 
 export const SUPERVISOR_KINDS = ['foreground', 'launchd', 'systemd', 'docker', 'unknown'] as const
 export type SupervisorKind = (typeof SUPERVISOR_KINDS)[number]

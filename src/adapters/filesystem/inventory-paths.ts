@@ -10,6 +10,8 @@ export type InventoryPaths = {
   lockFile: string
   connectionStateFile: string
   connectionStateLockFile: string
+  onboardingJournalFile: string
+  onboardingLockFile: string
   backupsDirectory: string
   quarantineDirectory: string
   source: InventoryPathSource
@@ -53,6 +55,8 @@ export function resolveInventoryPaths(options: ResolveInventoryPathsOptions = {}
     lockFile: join(rootDirectory, 'inventory.lock'),
     connectionStateFile: join(rootDirectory, 'connection-state.json'),
     connectionStateLockFile: join(rootDirectory, 'connection-state.lock'),
+    onboardingJournalFile: join(rootDirectory, 'onboarding-journal.json'),
+    onboardingLockFile: join(rootDirectory, 'onboarding.lock'),
     backupsDirectory: join(rootDirectory, 'backups'),
     quarantineDirectory: join(rootDirectory, 'quarantine'),
     source

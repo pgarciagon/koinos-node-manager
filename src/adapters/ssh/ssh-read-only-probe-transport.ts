@@ -77,6 +77,9 @@ export class SshReadOnlyProbeTransport implements ReadOnlyProbeTransport {
 
   async execute(request: ProbeRequest): Promise<ProbeResponse> {
     const started = this.#now()
+    if (request.connection.kind !== 'ssh') {
+      return { outcome: 'unsupported', durationMs: elapsed(this.#now, started), payload: null }
+    }
     const timeoutMs = Math.max(1000, Math.min(30000, Math.trunc(request.timeoutMs)))
     const connectTimeoutSeconds = Math.max(1, Math.ceil(timeoutMs / 1000))
     const remoteCommand = ALLOWLISTED_REMOTE_PROBES[request.kind]

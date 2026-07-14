@@ -4,3 +4,4 @@ src/generated/build-identity.ts
 coverage/
 *.log
 .DS_Store
+.artifacts/

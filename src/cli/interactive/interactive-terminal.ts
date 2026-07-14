@@ -11,6 +11,7 @@ export interface InteractiveTerminal {
   readonly width: number
   readonly colorEnabled: boolean
   readLine(prompt: string): Promise<TerminalReadResult>
+  readPrivateLine(prompt: string, hidden: boolean): Promise<TerminalReadResult>
   write(text: string): void
   writeError(text: string): void
   clear(): void

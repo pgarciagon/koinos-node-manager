@@ -2,10 +2,11 @@
 
 - Status: active; the functional core and inventory foundation are being
   delivered CLI-first through `CLI_IMPLEMENTATION_PLAN.md`
-- Last updated: 2026-07-13
-- Current MVP priority: review the completed deterministic and live read-only
-  legacy multiservice inspection evidence; broad fleet mutation remains
-  deferred until an explicit next target is selected
+- Last updated: 2026-07-14
+- Current MVP status: the thin read-only Nodes and Node Detail desktop vertical
+  in `NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md` is complete;
+  onboarding live targets, a new private-target desktop run, and a production
+  agent artifact remain pending, and broad fleet mutation remains deferred
 - Initial repository: `pgarciagon/koinos-node-manager`
 - Strategy source: `NODE_FLEET_STRATEGY.md`
 - Delivery vehicle: the `knm` CLI proves each capability first; Electron is a
@@ -48,15 +49,37 @@ operator-facing, read-only view of an existing multiservice node that reports:
 - governance proposal IDs as configured, effective in the process, observed
   in block headers, and reported by network-wide proposal status/tally.
 
-The CLI proves the contract first. A later Electron dashboard calls the same
-use case through typed IPC and renders the same public DTO; it never parses CLI
-text or interprets Docker, SSH, configuration, or RPC payloads itself.
+The CLI proved the contract first. The implemented Electron desktop calls the
+same use case through typed IPC and renders the same public DTO; it never
+parses CLI text or interprets Docker, SSH, configuration, or RPC payloads
+itself.
+
+### 1.2 Implemented onboarding outcome
+
+The next MVP slice makes that inspection vertical accessible without making
+SSH the default operator experience:
+
+- **Quick Connect** uses a compatible JSON-RPC endpoint and exposes an
+  explicitly limited snapshot;
+- **Full Connect** pairs an authenticated read-only agent and exposes the full
+  evidence supported by the runtime; and
+- the existing exact-alias SSH path remains **Expert Connect** for legacy
+  nodes and diagnosis.
+
+Quick-to-Full upgrade preserves the stable node ID. All three transports feed
+the same functional core and sanitized public DTO. The detailed scope,
+security model, GUI workflow, phases, and exit criteria are defined in
+`NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`. This outcome is implemented for
+deterministic and local packaged validation; separate live and external
+artifact gates remain pending.
 
 ## 2. Scope And Boundaries
 
 Current active scope:
 
 - the focused read-only multiservice inspection MVP described above;
+- the implemented Quick and Full onboarding modes described in
+  `NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`;
 - a versioned `NodeInspectionSnapshot` and runtime inspection capability
   contract shared by CLI, Electron, and a future controller;
 - explicit evidence availability, provenance, freshness, and sanitized public
@@ -90,7 +113,7 @@ Excluded from the committed roadmap:
 - Fogata pools before Layer 3 and a contract security review;
 - mainnet producer mutation without fresh explicit approval.
 
-Frozen until the focused MVP exit is reviewed: automatic discovery/adoption
+Still frozen after the focused MVP exit review: automatic discovery/adoption
 expansion, continuous monitoring, lifecycle mutations, installation,
 start/stop/restart, logs/support bundles, backup/restore, upgrades, rollouts,
 wallets, producer changes, and all mainnet mutation. Existing Phase 3
@@ -632,13 +655,48 @@ re-applies when Koinos One records are imported).
    matching pre/post runtime evidence.
 6. **Done for the current status surface:** Teleno inspection parity against
    the same contract.
-7. **Application boundary done; UI deferred:** Narrow typed
-   `NodeInspectionApi` for Electron main. The thin read-only dashboard is a
-   later presentation task, not part of the completed CLI vertical.
+7. **Done:** Narrow typed `NodeInspectionApi`, public node directory, Electron
+   read bridge, and thin read-only Nodes and Node Detail presentation as
+   specified in
+   `NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md`.
 
 Exit: the strategy MVP Layer criterion passes. Existing Phase 3 adoption live
 validation may still be pending because inspection does not imply adoption or
 managed authority.
+
+### Phase 2.1 — Two-mode onboarding MVP (implemented; external/live gates pending)
+
+1. Define versioned onboarding, access-binding, public DTO, agent protocol,
+   endpoint policy, and secret-store contracts.
+2. Implement endpoint-only Quick Connect with accurate limitations.
+3. Implement authenticated read-only-agent Full Connect with replay-resistant
+   pairing and private credential storage.
+4. Preserve one stable node ID during Quick-to-Full upgrade and retain SSH as
+   Expert Connect.
+5. Deliver batch, interactive, Electron-main, and thin wizard parity over one
+   application API.
+6. Complete deterministic security tests and separately approved live
+   no-mutation audits.
+
+Exit: all criteria in `NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md` pass, or
+unavailable live criteria remain explicitly pending. No provisioning,
+monitoring, lifecycle, or chain mutation enters this phase.
+
+### Phase 2.2 — Read-only inspection desktop MVP (complete)
+
+1. Add a versioned public node-directory DTO and narrow Electron read bridge.
+2. Add a simple Nodes screen over persisted inventory.
+3. Add Node Detail over the existing `NodeInspectionApi` with Overview,
+   Components, Chain, and Governance sections.
+4. Make Refresh explicit and preserve honest partial, unavailable, unknown,
+   and stale states.
+5. Complete the onboarding-to-detail handoff and packaged desktop validation.
+
+Exit: the criteria in
+`NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md` pass without introducing
+background polling, lifecycle controls, or fleet mutation. Deterministic,
+compiled, Electron development, packaged, responsive, and visual gates pass;
+the new private-target desktop run remains separately pending.
 
 ### Phase 2.5 — Runtime lifecycle adapter and local instances (deferred)
 
@@ -811,4 +869,15 @@ Teleno adapter, batch/interactive command, sanitization boundary, fixed probes,
 and deterministic/compiled tests are present. No target was separately
 approved during the initial deterministic implementation; a subsequent
 separately authorized strictly read-only run passed with identical pre/post
-runtime evidence. Only the thin desktop presentation remains pending.
+runtime evidence. The thin desktop presentation is now complete; only a new
+private-target desktop run remains separately pending.
+
+## 16. Two-Mode Onboarding Selection — 2026-07-13
+
+Product review selected endpoint-only Quick Connect and paired read-only-agent
+Full Connect as the next MVP slice. SSH remains an advanced legacy path. The
+authoritative implementation sequence and security gates are in
+`NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`. That behavior is now implemented
+across the core, CLI, interactive CLI, and Electron onboarding surface; the
+production agent artifact and separately approved live audits remain pending.
+Broader fleet mutation remains deferred.

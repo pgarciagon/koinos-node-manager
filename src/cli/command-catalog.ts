@@ -22,6 +22,17 @@ import { runNodesAdd, runNodesInspect, runNodesList, runNodesRemove, runNodesSho
 import { runPaths } from './commands/paths.js'
 import { runSimulationScenarios } from './commands/simulation.js'
 import { runVersion } from './commands/version.js'
+import {
+  runOnboardingCancel,
+  runOnboardingFullApply,
+  runOnboardingFullPair,
+  runOnboardingFullPreview,
+  runOnboardingFullRevoke,
+  runOnboardingQuickApply,
+  runOnboardingQuickPreview,
+  runOnboardingReconcile,
+  runOnboardingStatus
+} from './commands/onboarding.js'
 
 const commandDefinitions = [
   {
@@ -102,9 +113,10 @@ const commandDefinitions = [
     path: ['nodes', 'inspect'],
     commandName: 'nodes.inspect',
     summary: 'Collect a bounded sanitized read-only snapshot from one existing node.',
-    usage: 'knm nodes inspect <node-id> [--section overview|components|chain|governance] [--timeout-ms <milliseconds>] [--output table|json]',
+    usage: 'knm nodes inspect <node-id> [--section overview|components|chain|governance] [--access quick|full|expert] [--timeout-ms <milliseconds>] [--output table|json]',
     options: [
       { syntax: '--section <name>', description: 'Collect only overview, components, chain, or governance evidence.', values: INSPECTION_SECTIONS },
+      { syntax: '--access <mode>', description: 'Override automatic access selection for diagnosis.', values: ['quick', 'full', 'expert'] },
       { syntax: '--timeout-ms <milliseconds>', description: 'Bound each fixed read-only probe to 1000-30000 milliseconds.' },
       { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
     ],
@@ -165,6 +177,112 @@ const commandDefinitions = [
     ],
     completion: { positionalSources: ['node-id'] },
     run: (args, runtime) => runNodesRemove(args, runtime.applicationContext())
+  },
+  {
+    path: ['onboarding', 'quick', 'preview'],
+    commandName: 'onboarding.quick.preview',
+    summary: 'Preview limited read-only onboarding through a private RPC endpoint input.',
+    usage: 'knm onboarding quick preview --id <node-id> [--name <display-name>] --rpc-endpoint-stdin [--allow-private] [--allow-loopback-http] [--output table|json]',
+    options: [
+      { syntax: '--id <node-id>', description: 'Set the stable inventory node ID.' },
+      { syntax: '--name <display-name>', description: 'Set the optional operator-facing name.' },
+      { syntax: '--rpc-endpoint-stdin', description: 'Read the private endpoint from the dedicated stdin channel.' },
+      { syntax: '--allow-private', description: 'Confirm review of a private-range HTTPS destination.' },
+      { syntax: '--allow-loopback-http', description: 'Permit loopback HTTP only for explicit local development.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    run: (args, runtime) => runOnboardingQuickPreview(args, runtime)
+  },
+  {
+    path: ['onboarding', 'quick', 'apply'],
+    commandName: 'onboarding.quick.apply',
+    summary: 'Apply an exact digest-confirmed Quick Connect review.',
+    usage: 'knm onboarding quick apply <review-id> --confirm <digest> [--output table|json]',
+    options: [
+      { syntax: '--confirm <digest>', description: 'Bind application to the exact reviewed digest.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    completion: { positionalSources: ['onboarding-id'] },
+    run: (args, runtime) => runOnboardingQuickApply(args, runtime)
+  },
+  {
+    path: ['onboarding', 'full', 'preview'],
+    commandName: 'onboarding.full.preview',
+    summary: 'Verify a read-only node agent and prepare identity-pinned pairing.',
+    usage: 'knm onboarding full preview --id <node-id> [--name <display-name>] --agent-endpoint-stdin --pairing-session <opaque-id> --identity-digest <sha256> [--allow-private] [--allow-loopback-http] [--output table|json]',
+    options: [
+      { syntax: '--id <node-id>', description: 'Set or preserve the stable inventory node ID.' },
+      { syntax: '--name <display-name>', description: 'Set the optional operator-facing name for a new node.' },
+      { syntax: '--agent-endpoint-stdin', description: 'Read the private agent endpoint from the dedicated stdin channel.' },
+      { syntax: '--pairing-session <opaque-id>', description: 'Bind the review to the agent-issued opaque pairing session.' },
+      { syntax: '--identity-digest <sha256>', description: 'Bind the review to the trusted agent fingerprint.' },
+      { syntax: '--allow-private', description: 'Confirm review of a private-range HTTPS destination.' },
+      { syntax: '--allow-loopback-http', description: 'Permit loopback HTTP only for explicit local development.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    run: (args, runtime) => runOnboardingFullPreview(args, runtime)
+  },
+  {
+    path: ['onboarding', 'full', 'pair'],
+    commandName: 'onboarding.full.pair',
+    summary: 'Consume a hidden single-use secret and verify agent key possession.',
+    usage: 'knm onboarding full pair <review-id> --pairing-secret-stdin [--output table|json]',
+    options: [
+      { syntax: '--pairing-secret-stdin', description: 'Read the single-use pairing secret through hidden or dedicated stdin input.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    completion: { positionalSources: ['onboarding-id'] },
+    run: (args, runtime) => runOnboardingFullPair(args, runtime)
+  },
+  {
+    path: ['onboarding', 'full', 'apply'],
+    commandName: 'onboarding.full.apply',
+    summary: 'Apply an exact digest-confirmed Full Connect review.',
+    usage: 'knm onboarding full apply <review-id> --confirm <digest> [--output table|json]',
+    options: [
+      { syntax: '--confirm <digest>', description: 'Bind application to the exact reviewed identity and capabilities.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    completion: { positionalSources: ['onboarding-id'] },
+    run: (args, runtime) => runOnboardingFullApply(args, runtime)
+  },
+  {
+    path: ['onboarding', 'full', 'revoke'],
+    commandName: 'onboarding.full.revoke',
+    summary: 'Revoke and remove one node agent inspection credential.',
+    usage: 'knm onboarding full revoke <node-id> --confirm <node-id> [--output table|json]',
+    options: [
+      { syntax: '--confirm <node-id>', description: 'Bind revocation to the exact stable node ID.' },
+      { syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }
+    ],
+    completion: { positionalSources: ['node-id'] },
+    run: (args, runtime) => runOnboardingFullRevoke(args, runtime)
+  },
+  {
+    path: ['onboarding', 'status'],
+    commandName: 'onboarding.status',
+    summary: 'Show a sanitized persisted onboarding review.',
+    usage: 'knm onboarding status <review-id> [--output table|json]',
+    options: [{ syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }],
+    completion: { positionalSources: ['onboarding-id'] },
+    run: (args, runtime) => runOnboardingStatus(args, runtime)
+  },
+  {
+    path: ['onboarding', 'cancel'],
+    commandName: 'onboarding.cancel',
+    summary: 'Cancel an uncommitted onboarding review.',
+    usage: 'knm onboarding cancel <review-id> [--output table|json]',
+    options: [{ syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }],
+    completion: { positionalSources: ['onboarding-id'] },
+    run: (args, runtime) => runOnboardingCancel(args, runtime)
+  },
+  {
+    path: ['onboarding', 'reconcile'],
+    commandName: 'onboarding.reconcile',
+    summary: 'Complete an exact interrupted onboarding commit from its private journal.',
+    usage: 'knm onboarding reconcile [--output table|json]',
+    options: [{ syntax: '--output <format>', description: 'Select human or versioned JSON output.', values: OUTPUT_FORMATS }],
+    run: (args, runtime) => runOnboardingReconcile(args, runtime)
   },
   {
     path: ['connections', 'list'],

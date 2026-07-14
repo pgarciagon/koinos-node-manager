@@ -1,6 +1,7 @@
 import type { AdoptionReview, ConnectionRecord, DiscoveryRecord } from '../domain/connection.js'
+import type { NodeAccessProfile, OnboardingReviewRecord } from '../domain/onboarding.js'
 
-export const CONNECTION_STATE_SCHEMA_VERSION = 1
+export const CONNECTION_STATE_SCHEMA_VERSION = 2
 
 export type ConnectionStateSnapshot = {
   schemaVersion: typeof CONNECTION_STATE_SCHEMA_VERSION
@@ -9,7 +10,12 @@ export type ConnectionStateSnapshot = {
   connections: readonly ConnectionRecord[]
   discoveries: readonly DiscoveryRecord[]
   adoptionReviews: readonly AdoptionReview[]
+  accessProfiles: readonly NodeAccessProfile[]
+  onboardingReviews: readonly OnboardingReviewRecord[]
 }
+
+export type ConnectionStateWrite = Pick<ConnectionStateSnapshot, 'connections' | 'discoveries' | 'adoptionReviews'>
+  & Partial<Pick<ConnectionStateSnapshot, 'accessProfiles' | 'onboardingReviews'>>
 
 export type ConnectionStateDiagnosticCheck = {
   id: string
@@ -25,10 +31,7 @@ export type ConnectionStateDiagnosticReport = {
 
 export interface ConnectionStateRepository {
   read(): Promise<ConnectionStateSnapshot>
-  save(
-    state: Pick<ConnectionStateSnapshot, 'connections' | 'discoveries' | 'adoptionReviews'>,
-    expectedRevision: number
-  ): Promise<ConnectionStateSnapshot>
+  save(state: ConnectionStateWrite, expectedRevision: number): Promise<ConnectionStateSnapshot>
   diagnose(): Promise<ConnectionStateDiagnosticReport>
   recoverLatestBackup(): Promise<ConnectionStateSnapshot>
 }
@@ -40,6 +43,8 @@ export function emptyConnectionState(): ConnectionStateSnapshot {
     updatedAt: null,
     connections: [],
     discoveries: [],
-    adoptionReviews: []
+    adoptionReviews: [],
+    accessProfiles: [],
+    onboardingReviews: []
   }
 }

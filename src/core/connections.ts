@@ -51,7 +51,7 @@ export async function addSshConnection(
       nextAction: 'Choose another stable ID or inspect the existing connection.'
     })
   }
-  if (snapshot.connections.some((connection) => connection.hostAlias === input.hostAlias)) {
+  if (snapshot.connections.some((connection) => connection.kind === 'ssh' && connection.hostAlias === input.hostAlias)) {
     throw new ApplicationError({
       code: 'SSH_ALIAS_CONFLICT',
       exitCode: EXIT_CODES.invalidInput,
@@ -84,6 +84,16 @@ export async function testConnection(
   timeoutMs: number
 ): Promise<{ connection: ConnectionRecord; evidence: ConnectionTestEvidence; revision: number }> {
   const connection = await getConnection(services.repository, connectionId)
+  if (connection.kind !== 'ssh') {
+    throw new ApplicationError({
+      code: 'CONNECTION_TEST_UNSUPPORTED',
+      exitCode: EXIT_CODES.transportUnavailable,
+      severity: 'error',
+      retryable: false,
+      message: 'This connection kind uses its onboarding-specific verification path.',
+      nextAction: 'Use the corresponding onboarding status or node inspection command.'
+    })
+  }
   if (!await services.aliasResolver.hasExactAlias(connection.hostAlias)) {
     throw new ApplicationError({
       code: 'SSH_ALIAS_NOT_CONFIGURED',
@@ -150,8 +160,52 @@ export async function removeConnection(
   return { connection: structuredClone(connection), revision: saved.revision }
 }
 
-export function sanitizeConnection(connection: ConnectionRecord): Omit<ConnectionRecord, 'hostAlias'> & { hostAlias: string } {
-  return { ...structuredClone(connection), hostAlias: '<SSH_ALIAS_PRESENT>' }
+export type PublicConnection = {
+  id: string
+  kind: ConnectionRecord['kind']
+  capabilityClass: 'ssh-observe' | 'public-observe' | 'paired-inspect'
+  privateCoordinatesConfigured: true
+  hostAlias?: '<SSH_ALIAS_PRESENT>'
+  endpointClass?: 'public-https' | 'reviewed-private-https' | 'loopback-development'
+  identityPinned?: true
+  credentialReferenceConfigured?: true
+  protocolVersion?: string
+  runtimeFlavor?: string
+  scopes?: readonly ['inspect']
+  createdAt: string
+  updatedAt: string
+  lastTest: ConnectionRecord['lastTest']
+}
+
+export function sanitizeConnection(connection: ConnectionRecord): PublicConnection {
+  const common = {
+    id: connection.id,
+    kind: connection.kind,
+    privateCoordinatesConfigured: true as const,
+    createdAt: connection.createdAt,
+    updatedAt: connection.updatedAt,
+    lastTest: structuredClone(connection.lastTest)
+  }
+  if (connection.kind === 'ssh') return { ...common, capabilityClass: 'ssh-observe', hostAlias: '<SSH_ALIAS_PRESENT>' }
+  if (connection.kind === 'public-rpc') {
+    return { ...common, capabilityClass: 'public-observe', endpointClass: publicEndpointClass(connection.endpointPolicy) }
+  }
+  return {
+    ...common,
+    capabilityClass: 'paired-inspect',
+    endpointClass: publicEndpointClass(connection.endpointPolicy),
+    identityPinned: true,
+    credentialReferenceConfigured: true,
+    protocolVersion: connection.protocolVersion,
+    runtimeFlavor: connection.runtimeFlavor,
+    scopes: ['inspect']
+  }
+}
+
+function publicEndpointClass(policy: 'https-public' | 'https-private-reviewed' | 'http-loopback-development') {
+  if (policy === 'https-public') return 'public-https' as const
+  if (policy === 'https-private-reviewed') return 'reviewed-private-https' as const
+  return 'loopback-development' as const
 }
 
 function connectionNotFound(id: string): ApplicationError {

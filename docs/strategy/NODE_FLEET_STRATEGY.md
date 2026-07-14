@@ -1,6 +1,6 @@
 # Node Fleet Strategy
 
-- Date: 2026-07-13
+- Date: 2026-07-14
 - Scope: unified strategy for running and managing multiple Koinos nodes from
   Koinos Node Manager — local and remote, observer and producer
 - Supersedes and archives:
@@ -49,10 +49,11 @@ The MVP proves one complete vertical before broader fleet management resumes:
 7. make the proven use case available to a thin Electron dashboard through
    typed APIs, never by parsing or spawning the CLI.
 
-Implementation status: items 1–6 are delivered, including a separately
-approved strictly read-only live audit with identical pre/post runtime
-evidence. The narrow versioned application API needed for item 7 is frozen;
-only the thin desktop presentation remains pending.
+Implementation status: items 1–7 are delivered, including a separately
+approved strictly read-only adapter audit with identical pre/post runtime
+evidence and the deterministic, packaged, responsive thin desktop product.
+The desktop renderer consumes only the sanitized directory and inspection
+contracts and never parses CLI output or handles a transport.
 
 The initial snapshot covers identity and network, component state, chain head
 and last irreversible block, progress/freshness, P2P availability, API
@@ -73,8 +74,31 @@ remain owned by their runtime repositories.
 
 Automatic discovery/adoption expansion, lifecycle mutation, continuous
 monitoring, logs/support bundles, installation, backups, upgrades, rollouts,
-wallets, producer changes, and all mainnet mutation are frozen until this MVP
-exit is met and reviewed.
+wallets, producer changes, and all mainnet mutation remain frozen after the MVP
+review. The onboarding slice below does not reopen them.
+
+## Delivered MVP Slice — Two-Mode Onboarding
+
+The inspection exit is now met and reviewed. The explicitly selected next
+slice makes that vertical easy to access through two primary operator modes:
+
+1. **Quick Connect** accepts a compatible JSON-RPC endpoint and returns an
+   explicitly limited read-only snapshot without SSH.
+2. **Full Connect** pairs an authenticated read-only node agent and returns the
+   complete inspection evidence supported by the runtime without routine SSH.
+
+The current exact-alias SSH path remains available as **Expert Connect** for
+legacy nodes and diagnosis. A Quick node upgrades to Full without changing its
+stable node ID. All modes normalize evidence through the same functional core,
+`NodeInspectionSnapshot`, and sanitized GUI-ready DTO.
+
+This slice is implemented deterministically across the functional core, CLI,
+interactive CLI, and Electron onboarding surface. Its authoritative delivery
+phases, pairing and endpoint security policies, GUI workflow, test matrix, and
+external/live pending criteria are in
+`docs/plans/NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`. Provisioning,
+automatic agent installation, continuous monitoring, lifecycle operations,
+wallets, producer changes, and all chain mutation remain frozen.
 
 ## Architecture Model
 
@@ -216,9 +240,9 @@ interface.
   approved live read-only validation with matching pre/post evidence.
 - **Delivered for the current status surface:** Add Teleno inspection parity and contract tests without exposing Teleno or
   multiservice internals to the presentation layer.
-- **Application API delivered; presentation pending:** Expose the use case
-  through a narrow typed Electron-main bridge and a thin read-only dashboard
-  after the now-proven live contract.
+- **Delivered:** Expose the use case through a narrow typed Electron-main
+  bridge and a thin read-only Nodes and Node Detail product after the proven
+  live contract.
 
 Exit: an approved existing or disposable multiservice node can be inspected
 without mutation; the operator can distinguish component health, chain
@@ -226,6 +250,23 @@ progress, producer state, and governance evidence; unsupported facts remain
 explicit; CLI and typed GUI consumers receive the same sanitized snapshot.
 
 The following layers resume only after this exit and an explicit scope review.
+
+### MVP Layer 1.5 — Two-mode onboarding (implemented; external/live gates pending)
+
+Goal: let a non-expert add an existing node without making SSH the normal
+product experience.
+
+- Add endpoint-only Quick Connect with accurate capability limitations.
+- Add authenticated read-only-agent Full Connect with replay-resistant pairing
+  and operating-system secret storage.
+- Preserve the stable node ID during Quick-to-Full upgrade.
+- Keep SSH as the advanced fallback and a validation oracle.
+- Expose one onboarding API to batch CLI, interactive CLI, Electron main, and a
+  future controller; the renderer never handles connections or secrets.
+
+Exit: the completion criteria in
+`docs/plans/NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md` pass. No provisioning,
+monitoring, lifecycle, or chain mutation enters this layer.
 
 ### Layer 1 — Runtime and flavor foundation
 

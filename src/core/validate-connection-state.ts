@@ -3,6 +3,7 @@ import { ApplicationError } from './application-error.js'
 import { EXIT_CODES } from './exit-codes.js'
 import { validateInventoryNodes } from './validate-node.js'
 import {
+  AGENT_SCOPES,
   CONNECTION_KINDS,
   CONNECTION_TEST_OUTCOMES,
   RUNTIME_KINDS,
@@ -18,12 +19,21 @@ import {
   NODE_FLAVORS,
   NODE_FUNCTIONS
 } from '../domain/node.js'
+import {
+  ACCESS_MODES,
+  NODE_ONBOARDING_CONTRACT_VERSION,
+  NODE_ONBOARDING_SCHEMA_VERSION,
+  ONBOARDING_MODES,
+  type NodeAccessProfile,
+  type OnboardingReviewRecord
+} from '../domain/onboarding.js'
 
 const STABLE_ID = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
 const HOST_ALIAS = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/
 const OPAQUE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 const DISCOVERY_ID = /^discovery_[0-9a-f]{16}$/
 const ADOPTION_ID = /^adoption_[0-9a-f]{16}$/
+const ONBOARDING_ID = /^onboarding_[0-9a-f]{16}$/
 const DIGEST = /^[0-9a-f]{64}$/
 const SENSITIVE_KEY = /password|passphrase|private.?key|api.?key|token|secret|mnemonic|seed.?phrase/i
 const SENSITIVE_VALUE = /-----BEGIN [^-]*PRIVATE KEY-----|(?:password|passphrase|token|secret|private[-_ ]?key)\s*[:=]/i
@@ -44,10 +54,14 @@ export function validateConnectionState(value: {
   connections: readonly unknown[]
   discoveries: readonly unknown[]
   adoptionReviews: readonly unknown[]
+  accessProfiles?: readonly unknown[]
+  onboardingReviews?: readonly unknown[]
 }): readonly string[] {
   const issues: string[] = []
   scanSensitiveKeys(value, 'state', issues)
   const connectionIds = new Set<string>()
+  const accessProfiles = value.accessProfiles ?? []
+  const onboardingReviews = value.onboardingReviews ?? []
   value.connections.forEach((connection, index) => {
     validateConnection(connection, `connections[${index}]`, issues)
     if (isObject(connection) && typeof connection.id === 'string') {
@@ -71,6 +85,22 @@ export function validateConnectionState(value: {
       adoptionIds.add(review.id)
     }
   })
+  const profileNodeIds = new Set<string>()
+  accessProfiles.forEach((profile, index) => {
+    validateAccessProfile(profile, `accessProfiles[${index}]`, issues)
+    if (isObject(profile) && typeof profile.nodeId === 'string') {
+      if (profileNodeIds.has(profile.nodeId)) issues.push('Access profile node IDs must be unique.')
+      profileNodeIds.add(profile.nodeId)
+    }
+  })
+  const onboardingIds = new Set<string>()
+  onboardingReviews.forEach((review, index) => {
+    validateOnboardingReview(review, `onboardingReviews[${index}]`, issues)
+    if (isObject(review) && typeof review.id === 'string') {
+      if (onboardingIds.has(review.id)) issues.push('Onboarding review IDs must be unique.')
+      onboardingIds.add(review.id)
+    }
+  })
   for (const discovery of value.discoveries) {
     if (!isObject(discovery) || !isObject(discovery.source)) continue
     const connectionId = discovery.source.connectionId
@@ -80,6 +110,14 @@ export function validateConnectionState(value: {
     if (!isObject(review)) continue
     if (typeof review.discoveryId === 'string' && !discoveryIds.has(review.discoveryId)) issues.push('An adoption review references a missing discovery.')
   }
+  for (const profile of accessProfiles) {
+    if (!isObject(profile) || !Array.isArray(profile.bindings)) continue
+    for (const binding of profile.bindings) {
+      if (!isObject(binding) || typeof binding.connectionRef !== 'string') continue
+      const connectionId = binding.connectionRef.startsWith('connection:') ? binding.connectionRef.slice('connection:'.length) : ''
+      if (!connectionIds.has(connectionId)) issues.push('An access profile references a missing connection.')
+    }
+  }
   return issues
 }
 
@@ -87,10 +125,14 @@ export function assertValidConnectionState(value: {
   connections: readonly unknown[]
   discoveries: readonly unknown[]
   adoptionReviews: readonly unknown[]
+  accessProfiles?: readonly unknown[]
+  onboardingReviews?: readonly unknown[]
 }): asserts value is {
   connections: readonly ConnectionRecord[]
   discoveries: readonly DiscoveryRecord[]
   adoptionReviews: readonly AdoptionReview[]
+  accessProfiles?: readonly NodeAccessProfile[]
+  onboardingReviews?: readonly OnboardingReviewRecord[]
 } {
   const issues = validateConnectionState(value)
   if (issues.length === 0) return
@@ -106,10 +148,26 @@ export function assertValidConnectionState(value: {
 
 function validateConnection(value: unknown, path: string, issues: string[]): void {
   if (!isObject(value)) return void issues.push(`${path} must be an object.`)
-  onlyKeys(value, ['id', 'kind', 'hostAlias', 'createdAt', 'updatedAt', 'lastTest'], path, issues)
   match(value.id, STABLE_ID, `${path}.id`, issues)
   enumField(value.kind, CONNECTION_KINDS, `${path}.kind`, issues)
-  match(value.hostAlias, HOST_ALIAS, `${path}.hostAlias`, issues)
+  if (value.kind === 'ssh') {
+    onlyKeys(value, ['id', 'kind', 'hostAlias', 'createdAt', 'updatedAt', 'lastTest'], path, issues)
+    match(value.hostAlias, HOST_ALIAS, `${path}.hostAlias`, issues)
+  } else if (value.kind === 'public-rpc') {
+    onlyKeys(value, ['id', 'kind', 'endpoint', 'endpointPolicy', 'createdAt', 'updatedAt', 'lastTest'], path, issues)
+    endpoint(value.endpoint, `${path}.endpoint`, issues)
+    enumField(value.endpointPolicy, ['https-public', 'https-private-reviewed', 'http-loopback-development'], `${path}.endpointPolicy`, issues)
+  } else if (value.kind === 'agent') {
+    onlyKeys(value, ['id', 'kind', 'endpoint', 'endpointPolicy', 'pinnedAgentIdentityDigest', 'credentialRef', 'protocolVersion', 'runtimeFlavor', 'scopes', 'createdAt', 'updatedAt', 'lastTest'], path, issues)
+    endpoint(value.endpoint, `${path}.endpoint`, issues)
+    enumField(value.endpointPolicy, ['https-public', 'https-private-reviewed', 'http-loopback-development'], `${path}.endpointPolicy`, issues)
+    match(value.pinnedAgentIdentityDigest, DIGEST, `${path}.pinnedAgentIdentityDigest`, issues)
+    match(value.credentialRef, /^agent-credential:[a-z0-9][a-z0-9-]{0,63}$/, `${path}.credentialRef`, issues)
+    string(value.protocolVersion, 1, 40, `${path}.protocolVersion`, issues)
+    enumField(value.runtimeFlavor, NODE_FLAVORS, `${path}.runtimeFlavor`, issues)
+    if (!Array.isArray(value.scopes) || value.scopes.length === 0) issues.push(`${path}.scopes must be a non-empty array.`)
+    else for (const scope of value.scopes) enumField(scope, AGENT_SCOPES, `${path}.scopes`, issues)
+  }
   timestamp(value.createdAt, `${path}.createdAt`, issues)
   timestamp(value.updatedAt, `${path}.updatedAt`, issues)
   if (value.lastTest !== null) {
@@ -266,6 +324,92 @@ function validateAuthority(value: unknown, path: string, issues: string[]): void
   onlyKeys(value, keys, path, issues)
   for (const key of keys) boolean(value[key], `${path}.${key}`, issues)
   if (value.producerControl !== false || value.walletAccess !== false) issues.push(`${path} cannot grant producer or wallet authority in Phase 3.`)
+}
+
+function validateAccessProfile(value: unknown, path: string, issues: string[]): void {
+  if (!isObject(value)) return void issues.push(`${path} must be an object.`)
+  onlyKeys(value, ['nodeId', 'bindings', 'preferredInspectionMode'], path, issues)
+  match(value.nodeId, STABLE_ID, `${path}.nodeId`, issues)
+  enumField(value.preferredInspectionMode, ['automatic', ...ACCESS_MODES], `${path}.preferredInspectionMode`, issues)
+  if (!Array.isArray(value.bindings) || value.bindings.length === 0) return void issues.push(`${path}.bindings must be a non-empty array.`)
+  const references = new Set<string>()
+  value.bindings.forEach((binding, index) => {
+    const bindingPath = `${path}.bindings[${index}]`
+    if (!isObject(binding)) return void issues.push(`${bindingPath} must be an object.`)
+    onlyKeys(binding, ['connectionRef', 'mode', 'capabilityClass', 'verifiedAt', 'enabled'], bindingPath, issues)
+    match(binding.connectionRef, /^connection:[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/, `${bindingPath}.connectionRef`, issues)
+    enumField(binding.mode, ACCESS_MODES, `${bindingPath}.mode`, issues)
+    enumField(binding.capabilityClass, ['public-observe', 'paired-inspect', 'ssh-observe'], `${bindingPath}.capabilityClass`, issues)
+    timestamp(binding.verifiedAt, `${bindingPath}.verifiedAt`, issues)
+    boolean(binding.enabled, `${bindingPath}.enabled`, issues)
+    if (typeof binding.connectionRef === 'string') {
+      if (references.has(binding.connectionRef)) issues.push(`${path} contains a duplicate connection binding.`)
+      references.add(binding.connectionRef)
+    }
+  })
+}
+
+function validateOnboardingReview(value: unknown, path: string, issues: string[]): void {
+  if (!isObject(value)) return void issues.push(`${path} must be an object.`)
+  onlyKeys(value, [
+    'id', 'schemaVersion', 'contractVersion', 'digest', 'mode', 'status',
+    'connectionStateRevision', 'inventoryRevision', 'createdAt', 'expiresAt',
+    'candidateConnection', 'candidateNode', 'inspection', 'accessSummary', 'pairingSessionRef', 'appliedAt'
+  ], path, issues)
+  match(value.id, ONBOARDING_ID, `${path}.id`, issues)
+  if (value.schemaVersion !== NODE_ONBOARDING_SCHEMA_VERSION) issues.push(`${path}.schemaVersion is unsupported.`)
+  if (value.contractVersion !== NODE_ONBOARDING_CONTRACT_VERSION) issues.push(`${path}.contractVersion is unsupported.`)
+  match(value.digest, DIGEST, `${path}.digest`, issues)
+  enumField(value.mode, ONBOARDING_MODES, `${path}.mode`, issues)
+  enumField(value.status, ['pairing', 'review-ready', 'committed', 'cancelled', 'failed'], `${path}.status`, issues)
+  integer(value.connectionStateRevision, 0, Number.MAX_SAFE_INTEGER, `${path}.connectionStateRevision`, issues)
+  integer(value.inventoryRevision, 0, Number.MAX_SAFE_INTEGER, `${path}.inventoryRevision`, issues)
+  timestamp(value.createdAt, `${path}.createdAt`, issues)
+  timestamp(value.expiresAt, `${path}.expiresAt`, issues)
+  validateConnection(value.candidateConnection, `${path}.candidateConnection`, issues)
+  issues.push(...validateInventoryNodes([value.candidateNode]).map(() => `${path}.candidateNode is invalid.`))
+  if (value.inspection !== null && !isObject(value.inspection)) issues.push(`${path}.inspection must be an object or null.`)
+  validateAccessSummary(value.accessSummary, `${path}.accessSummary`, issues)
+  if (value.appliedAt !== null) timestamp(value.appliedAt, `${path}.appliedAt`, issues)
+  if (value.pairingSessionRef !== undefined) match(value.pairingSessionRef, /^[A-Za-z0-9_-]{8,128}$/, `${path}.pairingSessionRef`, issues)
+  const { id: _id, digest: _digest, status: _status, appliedAt: _appliedAt, ...content } = value
+  if (typeof value.digest === 'string' && typeof value.id === 'string') {
+    const calculated = createHash('sha256').update(JSON.stringify(content)).digest('hex')
+    if (value.digest !== calculated || value.id !== `onboarding_${calculated.slice(0, 16)}`) issues.push(`${path} digest does not match its reviewed content.`)
+  }
+}
+
+function validateAccessSummary(value: unknown, path: string, issues: string[]): void {
+  if (!isObject(value)) return void issues.push(`${path} must be an object.`)
+  onlyKeys(value, ['mode', 'status', 'capabilities', 'authority', 'lastVerifiedAt', 'freshness', 'warnings'], path, issues)
+  enumField(value.mode, ACCESS_MODES, `${path}.mode`, issues)
+  enumField(value.status, ['connected', 'degraded', 'unavailable'], `${path}.status`, issues)
+  enumField(value.authority, ['public-observe', 'paired-inspect', 'ssh-observe'], `${path}.authority`, issues)
+  timestamp(value.lastVerifiedAt, `${path}.lastVerifiedAt`, issues)
+  enumField(value.freshness, ['fresh', 'stale'], `${path}.freshness`, issues)
+  if (!isObject(value.capabilities)) issues.push(`${path}.capabilities must be an object.`)
+  else {
+    const keys = ['overview', 'components', 'chain', 'governance', 'apis', 'producer', 'resources']
+    onlyKeys(value.capabilities, keys, `${path}.capabilities`, issues)
+    for (const key of keys) boolean(value.capabilities[key], `${path}.capabilities.${key}`, issues)
+  }
+  if (!Array.isArray(value.warnings)) issues.push(`${path}.warnings must be an array.`)
+  else value.warnings.forEach((warning, index) => string(warning, 1, 200, `${path}.warnings[${index}]`, issues))
+}
+
+function endpoint(value: unknown, path: string, issues: string[]): void {
+  if (typeof value !== 'string' || value.length > 2048 || /[\u0000-\u0020\u007f]/.test(value)) {
+    issues.push(`${path} must be a valid private endpoint.`)
+    return
+  }
+  try {
+    const parsed = new URL(value)
+    if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username !== '' || parsed.password !== '' || parsed.hash !== '') {
+      issues.push(`${path} must use an approved HTTP scheme without credentials or fragments.`)
+    }
+  } catch {
+    issues.push(`${path} must be a valid private endpoint.`)
+  }
 }
 
 function scanSensitiveKeys(value: unknown, path: string, issues: string[], seen = new Set<object>()): void {

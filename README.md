@@ -1,7 +1,8 @@
 # Koinos Node Manager
 
-Koinos Node Manager is a planned operator application for installing,
-monitoring, upgrading, backing up, and safely managing fleets of Koinos nodes.
+Koinos Node Manager is a CLI-first operator application for inspecting and
+eventually managing fleets of Koinos nodes. The currently implemented product
+surface is deliberately read-only.
 
 It is intentionally separate from
 [Koinos One](https://github.com/koinos/koinos-one):
@@ -31,12 +32,64 @@ backup, quarantine, and recovery checks. It also provides opaque SSH-alias
 connections, bounded allowlisted read-only probes, sanitized discovery
 evidence, and digest-reviewed inventory-only adoption.
 
+The Two-Mode Node Onboarding MVP is implemented across the functional core,
+batch and interactive CLI, and a thin Electron workflow. Quick Connect uses a
+compatible JSON-RPC endpoint for explicitly limited evidence. Full Connect
+pairs an authenticated read-only agent, pins its identity, stores credentials
+through the operating-system secret store, and upgrades a Quick node without
+changing its stable ID. Exact-alias SSH remains supported as Expert Connect.
+Deterministic, compiled CLI, Electron smoke, packaged Electron, security, and
+interruption-recovery gates pass. Separately approved Quick and Full live
+targets and a separately authorized production agent artifact remain pending;
+the repository does not claim those external gates passed. See the
+[Existing Node Onboarding Guide](docs/guides/NODE_ONBOARDING_GUIDE.md) and
+[MVP completion audit](docs/validation/TWO_MODE_NODE_ONBOARDING_MVP_AUDIT.md).
+
+The Node Inspection Desktop MVP is also implemented. The real Electron
+application starts on a sanitized persisted node directory, opens a read-only
+Node Detail with Overview, Components, Chain, and Governance, and refreshes
+only when the operator selects **Refresh**. Quick and Full onboarding now hand
+off directly to the same stable node. The renderer remains sandboxed and has
+no network, filesystem, process, SSH, Docker, secret, or CLI-parsing access.
+The deterministic, compiled, Electron development, packaged, accessibility,
+responsive, and visual gates pass. A new private-target desktop run was not
+performed; the underlying adapter retains the separately approved live
+read-only evidence described above. See the
+[desktop MVP audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_AUDIT.md).
+
 The existing remote-management MVP was developed inside Koinos One; its
 technical plans and evidence have been moved here as the starting point for a
 clean product extraction.
 
 No mainnet producer mutation is authorized or implemented by this repository
 at this stage.
+
+## Desktop Quick Start
+
+Requirements: Node.js 22 or later.
+
+```bash
+npm install
+npm run desktop
+```
+
+The application uses the same persisted inventory and functional core as the
+CLI. It opens on **Nodes**. Select a node to run one bounded read-only
+inspection, select **Refresh** to request new evidence, or select **Add node**
+to use Quick or Full onboarding. There is no background polling and inspection
+snapshots are not persisted.
+
+For a clean isolated local launch without touching the normal inventory:
+
+```bash
+KNM_HOME="$(mktemp -d)" npm run desktop
+```
+
+Build and smoke-test the packaged application:
+
+```bash
+npm run test:electron:packaged
+```
 
 ## CLI Quick Start
 
@@ -180,6 +233,49 @@ and wallet authority remain disabled.
 discovery storage without contacting any host. Remote handshake probes occur
 only with the explicit `doctor --check-connections` option.
 
+## Two-Mode Existing Node Onboarding
+
+Quick Connect requires no SSH or agent. Private endpoints enter through the
+dedicated input channel and never appear in arguments or public output:
+
+```bash
+printf '%s\n' '<KOINOS_JSON_RPC_ENDPOINT>' | npm run cli -- \
+  onboarding quick preview --id existing-observer \
+  --rpc-endpoint-stdin --output json
+
+npm run cli -- onboarding quick apply \
+  <ONBOARDING_REVIEW_ID> --confirm <REVIEW_DIGEST>
+
+npm run cli -- nodes inspect existing-observer --access quick
+```
+
+Full Connect uses the compatible read-only agent protocol and no user-authored
+SSH config entry. The endpoint and pairing secret use separate private input
+operations; the credential is stored outside filesystem JSON:
+
+```bash
+printf '%s\n' '<PRIVATE_AGENT_ENDPOINT>' | npm run cli -- \
+  onboarding full preview --id existing-observer \
+  --agent-endpoint-stdin \
+  --pairing-session <OPAQUE_SESSION> \
+  --identity-digest <AGENT_IDENTITY_SHA256> \
+  --allow-private --output json
+
+printf '%s\n' '<SINGLE_USE_PAIRING_SECRET>' | npm run cli -- \
+  onboarding full pair <PAIRING_REVIEW_ID> \
+  --pairing-secret-stdin --output json
+
+npm run cli -- onboarding full apply \
+  <FULL_REVIEW_ID> --confirm <FULL_REVIEW_DIGEST>
+```
+
+The repository implements the protocol client and deterministic fake, but does
+not publish or install a production node-agent artifact. Full live use requires
+a separately approved compatible agent. Existing SSH inspection remains
+available as Expert Connect. Detailed operation, revocation, recovery, and
+Electron instructions are in the
+[Existing Node Onboarding Guide](docs/guides/NODE_ONBOARDING_GUIDE.md).
+
 ## Read-Only Node Inspection MVP
 
 An existing inventory node can be inspected through its opaque connection
@@ -300,6 +396,8 @@ build time.
 - [CLI Phase 2 persisted inventory audit](docs/validation/CLI_PHASE_2_PERSISTED_INVENTORY_AUDIT.md)
 - [CLI Phase 3 completion audit](docs/validation/CLI_PHASE_3_CONNECTIONS_DISCOVERY_ADOPTION_AUDIT.md)
 - [Read-only inspection MVP completion audit](docs/validation/CLI_PHASE_4_MULTISERVICE_INSPECTION_MVP_AUDIT.md)
+- [Node Inspection Desktop MVP plan](docs/plans/NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md)
+- [Node Inspection Desktop MVP completion audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_AUDIT.md)
 - [Archived source plans](docs/archive/README.md)
 - [UI explorations](assets/ui/)
 

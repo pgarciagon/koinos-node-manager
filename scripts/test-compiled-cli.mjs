@@ -82,6 +82,15 @@ try {
 
   assert.match(run(['nodes', '--help']), /nodes list/)
   assert.match(run(['interactive', '--help']), /Start a prompt-driven session over local or simulated inventory/)
+  assert.match(run(['onboarding', '--help']), /onboarding quick preview/)
+  assert.match(run(['onboarding', '--help']), /onboarding full pair/)
+  const privateInputRequired = spawnSync(process.execPath, [executable, 'onboarding', 'full', 'pair', 'onboarding_0000000000000000'], {
+    cwd: repositoryRoot,
+    encoding: 'utf8',
+    env: { ...process.env, KNM_HOME: inventoryHome }
+  })
+  assert.equal(privateInputRequired.status, 2)
+  assert.match(privateInputRequired.stderr, /pairing-secret-stdin/)
 
   const added = JSON.parse(run([
     'nodes', 'add', '--id', 'compiled-observer', '--name', 'Compiled Observer',

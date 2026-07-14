@@ -6,6 +6,7 @@ import {
   type InspectionSection,
   type PublicNodeInspectionSnapshot
 } from '../domain/inspection.js'
+import type { AccessMode } from '../domain/onboarding.js'
 
 export const NODE_INSPECTION_API_VERSION = '1.0.0' as const
 
@@ -13,6 +14,7 @@ export type NodeInspectionApiRequest = {
   nodeId: string
   sections: readonly InspectionSection[]
   timeoutMs: number
+  accessMode?: AccessMode
 }
 
 export type NodeInspectionApiResponse = {
@@ -32,7 +34,7 @@ export function createNodeInspectionApi(services: NodeInspectionServices): NodeI
       validateInspectionApiRequest(request)
       return {
         apiVersion: NODE_INSPECTION_API_VERSION,
-        snapshot: await inspectNode(services, request.nodeId, request.sections, request.timeoutMs),
+        snapshot: await inspectNode(services, request.nodeId, request.sections, request.timeoutMs, request.accessMode),
         runtimeChanged: false,
         persisted: false
       }
@@ -44,7 +46,7 @@ function validateInspectionApiRequest(request: NodeInspectionApiRequest): void {
   if (
     typeof request !== 'object'
     || request === null
-    || Object.keys(request).some((key) => !['nodeId', 'sections', 'timeoutMs'].includes(key))
+    || Object.keys(request).some((key) => !['nodeId', 'sections', 'timeoutMs', 'accessMode'].includes(key))
     || typeof request.nodeId !== 'string'
     || request.nodeId.length === 0
     || request.nodeId.length > 128
@@ -55,6 +57,7 @@ function validateInspectionApiRequest(request: NodeInspectionApiRequest): void {
     || !Number.isInteger(request.timeoutMs)
     || request.timeoutMs < 1_000
     || request.timeoutMs > 30_000
+    || request.accessMode !== undefined && !['quick', 'full', 'expert'].includes(request.accessMode)
   ) {
     throw new ApplicationError({
       code: 'INVALID_NODE_INSPECTION_REQUEST',

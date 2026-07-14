@@ -67,6 +67,18 @@ must use the localization system and must not create mixed-language source copy.
 - Active strategy: `docs/strategy/NODE_FLEET_STRATEGY.md`
 - Active implementation plan: `docs/plans/NODE_FLEET_IMPLEMENTATION_PLAN.md`
 - CLI implementation plan: `docs/plans/CLI_IMPLEMENTATION_PLAN.md`
+- Node onboarding MVP plan:
+  `docs/plans/NODE_ONBOARDING_MVP_IMPLEMENTATION_PLAN.md`
+- Node inspection desktop MVP plan:
+  `docs/plans/NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md`
+- Node inspection desktop implementation goal:
+  `docs/plans/NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_GOAL.md`
+- Node onboarding operator guide:
+  `docs/guides/NODE_ONBOARDING_GUIDE.md`
+- Read-only node-agent protocol:
+  `docs/protocols/KOINOS_NODE_AGENT_PROTOCOL.md`
+- Node onboarding completion audit:
+  `docs/validation/TWO_MODE_NODE_ONBOARDING_MVP_AUDIT.md`
 - Interactive CLI plan: `docs/plans/INTERACTIVE_CLI_IMPLEMENTATION_PLAN.md`
 - CLI Phase 3 plan: `docs/plans/CLI_PHASE_3_IMPLEMENTATION_PLAN.md`
 - CLI architecture: `docs/CLI_ARCHITECTURE.md`
