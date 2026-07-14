@@ -128,6 +128,9 @@ All notable changes to Koinos Node Manager will be documented in this file.
 - Additional approved legacy seed-node validation proving that a deployed and
   running block-producer service is not reported as configured or effective
   production without independent producer-address evidence.
+- Approved isolated live-desktop validation against a public mainnet seed using
+  Quick Connect, including explicit refresh, section navigation, CLI parity,
+  and restart persistence without runtime or blockchain mutation.
 
 ### Changed
 
@@ -164,3 +167,8 @@ All notable changes to Koinos Node Manager will be documented in this file.
   encodings, block-store samples newer than the concurrent chain sample remain
   unknown instead of producing a false mismatch, and the fixed secondary
   producer service is normalized without exposing its runtime-specific name.
+- Pinned HTTPS DNS lookup now supports both the single-address and `all: true`
+  callback shapes used by Node.js 22, preserving address pinning for public RPC
+  and node-agent requests without false unreachable results.
+- Public RPC inspection now recognizes the canonical Koinos mainnet chain ID,
+  and deterministic mainnet fixtures use the same identity.

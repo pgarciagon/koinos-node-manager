@@ -1,9 +1,8 @@
 import http from 'node:http'
 import https from 'node:https'
-import type { LookupFunction } from 'node:net'
 import type { AgentClient, AgentEndpoint } from '../../core/agent-client.js'
 import { agentError } from '../../core/agent-protocol.js'
-import { approveEndpoint, type AddressResolver, type ApprovedEndpoint } from '../../core/endpoint-policy.js'
+import { approveEndpoint, createPinnedLookup, type AddressResolver, type ApprovedEndpoint } from '../../core/endpoint-policy.js'
 import type {
   AgentDiscoveryDocument,
   AgentPairingRequest,
@@ -98,7 +97,6 @@ function fixedAgentRequest(
   const selected = approved.addresses[0]
   if (selected === undefined) return Promise.reject(new Error('unreachable'))
   const transport = url.protocol === 'https:' ? https : http
-  const lookup: LookupFunction = (_hostname, _options, callback) => callback(null, selected.address, selected.family)
   return new Promise((resolve, reject) => {
     const totalTimer = setTimeout(() => request.destroy(new Error('timeout')), timeoutMs)
     const request = transport.request(url, {
@@ -108,7 +106,7 @@ function fixedAgentRequest(
         ...(body === '' ? {} : { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) }),
         ...(credential === undefined ? {} : { authorization: `Bearer ${credential}` })
       },
-      lookup,
+      lookup: createPinnedLookup(selected),
       ...(url.protocol === 'https:' ? { servername: approved.url.hostname } : {})
     }, (incoming) => {
       if (incoming.statusCode !== 200 || incoming.headers.location !== undefined) {

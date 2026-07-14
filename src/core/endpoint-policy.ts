@@ -1,4 +1,5 @@
 import { isIP } from 'node:net'
+import type { LookupFunction } from 'node:net'
 import { lookup } from 'node:dns/promises'
 import { ApplicationError } from './application-error.js'
 import { EXIT_CODES } from './exit-codes.js'
@@ -16,6 +17,16 @@ export type ApprovedEndpoint = {
 }
 
 export type AddressResolver = (hostname: string) => Promise<readonly { address: string; family: 4 | 6 }[]>
+
+export function createPinnedLookup(selected: { address: string; family: 4 | 6 }): LookupFunction {
+  return (_hostname, options, callback) => {
+    if (options.all === true) {
+      callback(null, [{ address: selected.address, family: selected.family }])
+      return
+    }
+    callback(null, selected.address, selected.family)
+  }
+}
 
 export async function approveEndpoint(
   input: EndpointPolicyInput,

@@ -12,11 +12,14 @@ const connection: PublicRpcConnectionRecord = {
   createdAt: INSPECTION_NOW, updatedAt: INSPECTION_NOW, lastTest: null
 }
 
-function request(): RuntimeInspectionRequest {
+const MAINNET_CHAIN_ID = 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA=='
+const TESTNET_CHAIN_ID = 'EiAIKVvm6-V2qmsmUvPJy09vCCLbtn9lHFpwrJbcTIEWRQ=='
+
+function request(chainId = TESTNET_CHAIN_ID): RuntimeInspectionRequest {
   const transport = new FakeProbeTransport({
     outcome: 'success',
     payloads: {
-      'node.multiservice.chain-id': jsonRpc({ chain_id: 'EiAIKVvm6-V2qmsmUvPJy09vCCLbtn9lHFpwrJbcTIEWRQ==' }),
+      'node.multiservice.chain-id': jsonRpc({ chain_id: chainId }),
       'node.multiservice.chain-head': jsonRpc({
         head_topology: { id: `0x${'1'.repeat(64)}`, height: '1200' },
         last_irreversible_block: '1198',
@@ -45,6 +48,12 @@ describe('public Koinos RPC inspection', () => {
     assert.equal(snapshot.governance.configuredProposalIds.availability, 'unavailable')
     assert.equal(snapshot.capabilities.components, false)
     assert.equal(snapshot.warnings[0]?.code, 'QUICK_INSPECTION_LIMITED')
+  })
+
+  it('recognizes the canonical Koinos mainnet chain identity', async () => {
+    const snapshot = await new PublicKoinosRpcInspectionAdapter().inspect(request(MAINNET_CHAIN_ID))
+    assert.equal(snapshot.overview.network.availability, 'available')
+    if (snapshot.overview.network.availability === 'available') assert.equal(snapshot.overview.network.value.name, 'mainnet')
   })
 
   it('fails closed when neither identity nor head evidence is usable', async () => {

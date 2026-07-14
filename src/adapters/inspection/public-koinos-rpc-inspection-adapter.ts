@@ -15,7 +15,7 @@ import {
 } from '../../domain/inspection.js'
 import type { NetworkName } from '../../domain/node.js'
 
-const MAINNET_CHAIN_ID = 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3qckQpFQVS6Q8='
+const MAINNET_CHAIN_ID = 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA=='
 const TESTNET_CHAIN_ID = 'EiAIKVvm6-V2qmsmUvPJy09vCCLbtn9lHFpwrJbcTIEWRQ=='
 
 type ChainFacts = {

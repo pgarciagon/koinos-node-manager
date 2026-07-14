@@ -1,6 +1,7 @@
 # Node Inspection Desktop MVP Implementation Plan
 
-- Status: complete; deterministic and packaged gates passed on 2026-07-14
+- Status: complete; deterministic, packaged, and approved public mainnet
+  live-desktop gates passed on 2026-07-14
 - Date: 2026-07-14
 - Product: Koinos Node Manager
 - Product principle: simplicity with immediate operator value

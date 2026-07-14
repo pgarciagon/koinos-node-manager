@@ -1,7 +1,6 @@
 import http from 'node:http'
 import https from 'node:https'
-import type { LookupFunction } from 'node:net'
-import { approveEndpoint, type AddressResolver, type ApprovedEndpoint } from '../../core/endpoint-policy.js'
+import { approveEndpoint, createPinnedLookup, type AddressResolver, type ApprovedEndpoint } from '../../core/endpoint-policy.js'
 import type { ProbeRequest, ProbeResponse, RuntimeInspectionProbeKind } from '../../core/probe-transport.js'
 import type { ReadOnlyProbeTransport } from '../../core/probe-transport.js'
 
@@ -76,9 +75,6 @@ function fixedJsonRpcRequest(approved: ApprovedEndpoint, method: string, timeout
   const selected = approved.addresses[0]
   if (selected === undefined) return Promise.reject(new Error('unreachable'))
   const transport = approved.url.protocol === 'https:' ? https : http
-  const lookup: LookupFunction = (_hostname, _options, callback) => {
-    callback(null, selected.address, selected.family)
-  }
   return new Promise((resolve, reject) => {
     const totalTimer = setTimeout(() => request.destroy(new Error('timeout')), timeoutMs)
     const request = transport.request(approved.url, {
@@ -88,7 +84,7 @@ function fixedJsonRpcRequest(approved: ApprovedEndpoint, method: string, timeout
         'content-type': 'application/json',
         'content-length': Buffer.byteLength(body)
       },
-      lookup,
+      lookup: createPinnedLookup(selected),
       ...(approved.url.protocol === 'https:' ? { servername: approved.url.hostname } : {})
     }, (incoming) => {
       if (incoming.statusCode !== 200 || incoming.headers.location !== undefined) {

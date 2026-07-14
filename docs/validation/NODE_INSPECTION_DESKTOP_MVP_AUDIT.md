@@ -4,7 +4,7 @@
 - Product version: `0.1.0-dev.0`
 - Deterministic implementation status: complete
 - Packaged application status: passed on macOS arm64
-- New private-target desktop validation: pending separate execution approval
+- Approved public mainnet desktop validation: passed through Quick Connect
 - Runtime and blockchain mutation: none implemented or authorized
 
 ## Result
@@ -35,7 +35,7 @@ Passed on 2026-07-14:
 
 ```text
 npm run verify
-  192 tests passed
+  194 tests passed
   compiled CLI smoke passed
   Electron development smoke: KNM_ELECTRON_SMOKE_OK
 
@@ -52,6 +52,56 @@ this final result is the authoritative one recorded in the handoff.
 The packaged `app.asar` contains the production Electron main, preload,
 renderer, HTML, and CSS. It does not contain the deterministic browser fixture
 generator or fixture bridge.
+
+## Approved Live Desktop Validation
+
+The development Electron application was launched with an isolated temporary
+`KNM_HOME` and connected to `<APPROVED_PUBLIC_SEED_ENDPOINT>` on 2026-07-14.
+The target was explicitly approved for this validation and was accessed only
+through Quick Connect. The normal operator inventory was inspected only to
+confirm that it was unsuitable for this exercise; it was not modified. All
+onboarding and persistence occurred under the temporary `KNM_HOME`.
+
+The complete live desktop journey passed:
+
+```text
+empty Nodes
+  -> Quick Connect review
+  -> add limited node
+  -> Overview / Components / Chain / Governance
+  -> explicit Refresh
+  -> Back to nodes
+  -> application restart
+  -> reopen the persisted node
+```
+
+Observed evidence was intentionally limited to facts exposed by the fixed
+public Koinos JSON-RPC probes:
+
+- the review and Node Detail identified the canonical Koinos mainnet chain;
+- head, last irreversible block, head age, and P2P gossip were available;
+- the explicit Refresh observed the head advance by 11 blocks;
+- runtime, components, producer, resources, peer count, and all four governance
+  categories remained explicitly unknown or unavailable;
+- reopening the node after an application restart performed a new bounded
+  inspection and returned newer fresh evidence;
+- the matching CLI inspection returned `readOnly: true`,
+  `runtimeChanged: false`, and `persisted: false`; and
+- isolated inventory and connection-state files were private mode `0600`, while
+  no inspection snapshot was added to the inventory record.
+
+The only remote methods reachable through this path were the fixed read-only
+`chain.get_chain_id`, `chain.get_head_info`, and `p2p.get_gossip_status`
+probes. No SSH, agent, shell, Docker, configuration, producer, wallet,
+transaction, or administrative method was used.
+
+Live validation found and fixed two implementation defects before the desktop
+journey was accepted:
+
+| Defect | Resolution | Regression evidence |
+| --- | --- | --- |
+| Node.js 22 HTTPS requests can call a custom DNS lookup with `all: true`; the pinned lookup returned the legacy single-address shape and caused `ERR_INVALID_IP_ADDRESS` | Added one shared pinned lookup that returns the requested single or array form; reused it in public RPC and node-agent HTTPS transports | `tests/onboarding-contracts.test.ts` |
+| The public RPC adapter compared against a non-canonical mainnet chain ID and displayed the live seed as Custom | Replaced it with the canonical chain ID and corrected deterministic mainnet fixtures | `tests/public-rpc-inspection-adapter.test.ts` |
 
 ## Requirement Audit
 
@@ -157,17 +207,17 @@ All ten review questions passed in the final two cycles:
 9. Native controls, focus targets, labels, and tabs support keyboard use.
 10. Refresh explicitly says that it runs bounded probes and never changes the node.
 
-## Pending External Criterion
+## External Criteria
 
-The underlying legacy multiservice adapter already has a separately approved
-strictly read-only live audit with matching pre/post evidence in
-`CLI_PHASE_4_MULTISERVICE_INSPECTION_MVP_AUDIT.md`. This goal did not open or
-capture a private real inventory in the desktop application. A fresh
-private-target desktop journey therefore remains pending separate execution
-approval and sanitized evidence capture; it is not reported as passed.
+No required live criterion remains pending for the public Quick Connect desktop
+journey. The underlying legacy multiservice adapter also retains its separately
+approved strictly read-only live audit with matching pre/post evidence in
+`CLI_PHASE_4_MULTISERVICE_INSPECTION_MVP_AUDIT.md`.
 
-That pending external criterion does not affect the completed deterministic,
-compiled, packaged, security, responsive, or usability result.
+This validation does not claim that a private Full or Expert desktop target was
+opened. Such a validation would require a separate approved target and would be
+useful only to exercise live component, producer, resource, and governance
+evidence beyond the intentionally limited public Quick surface.
 
 ## Scope Audit
 

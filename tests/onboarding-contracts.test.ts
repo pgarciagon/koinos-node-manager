@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { approveEndpoint } from '../src/core/endpoint-policy.js'
+import { approveEndpoint, createPinnedLookup } from '../src/core/endpoint-policy.js'
 import { sanitizeConnection } from '../src/core/connections.js'
 import { reduceOnboardingState } from '../src/core/onboarding-state-machine.js'
 import { selectAccessBinding } from '../src/core/node-access.js'
@@ -35,6 +35,19 @@ describe('onboarding contracts', () => {
     await assert.rejects(approveEndpoint({ endpoint: 'https://private.invalid', allowPrivate: false, allowLoopbackHttp: false }, async () => [{ address: '10.0.0.2', family: 4 }] as const), errorCode('ONBOARDING_ENDPOINT_PRIVATE_REVIEW_REQUIRED'))
     assert.equal((await approveEndpoint({ endpoint: 'https://private.invalid', allowPrivate: true, allowLoopbackHttp: false }, async () => [{ address: '10.0.0.2', family: 4 }] as const)).policy, 'https-private-reviewed')
     assert.equal((await approveEndpoint({ endpoint: 'http://127.0.0.1:8080', allowPrivate: false, allowLoopbackHttp: true })).policy, 'http-loopback-development')
+  })
+
+  it('returns the pinned address shape requested by current Node.js HTTPS clients', () => {
+    const lookup = createPinnedLookup({ address: '203.0.113.20', family: 4 })
+    lookup('node.example.invalid', { all: true }, (error, addresses) => {
+      assert.equal(error, null)
+      assert.deepEqual(addresses, [{ address: '203.0.113.20', family: 4 }])
+    })
+    lookup('node.example.invalid', { all: false }, (error, address, family) => {
+      assert.equal(error, null)
+      assert.equal(address, '203.0.113.20')
+      assert.equal(family, 4)
+    })
   })
 
   it('selects Full, Expert, then Quick and validates profile references', () => {

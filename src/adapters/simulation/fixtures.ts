@@ -50,7 +50,7 @@ function functions(states: Partial<NodeFunctions>): NodeFunctions {
 
 const homeFacts: NodeRuntimeFacts = {
   flavor: { id: 'teleno-monolith', version: '1.1.0' },
-  network: { name: 'mainnet', chainId: 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3qckQpFQVS6Q8=' },
+  network: { name: 'mainnet', chainId: 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA==' },
   location: { kind: 'local', environment: 'mac', connectionRef: 'local-primary' },
   functions: functions({ observer: 'enabled', producer: 'disabled', seed: 'disabled', api: 'enabled', 'backup-source': 'disabled' }),
   endpoints: [{ kind: 'jsonrpc', scope: 'local', address: 'http://127.0.0.1:8080' }],
@@ -59,7 +59,7 @@ const homeFacts: NodeRuntimeFacts = {
 
 const berlinFacts: NodeRuntimeFacts = {
   flavor: { id: 'legacy-microservices', version: '4.0.0' },
-  network: { name: 'mainnet', chainId: 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3qckQpFQVS6Q8=' },
+  network: { name: 'mainnet', chainId: 'EiBZK_GGVP0H_fXVAM3j6EAuz3-B-l3ejxRSewi7qIBfSA==' },
   location: { kind: 'remote', environment: 'linux', connectionRef: 'ssh-berlin-producer' },
   functions: functions({ observer: 'enabled', producer: 'enabled', seed: 'enabled', api: 'disabled', 'backup-source': 'disabled' }),
   endpoints: [{ kind: 'p2p', scope: 'public', address: '/dns4/producer.example/tcp/8888/p2p/<PEER_ID>' }],
