@@ -35,7 +35,17 @@ function fixtureBridgeSource() {
   const safeError = {
     code: 'NODE_INSPECTION_UNREACHABLE', severity: 'error', retryable: true,
     message: 'The node did not respond to the bounded read-only inspection.',
-    nextAction: 'Check the connection and select Refresh to try again.'
+    nextAction: 'Check the connection and select Try again.'
+  }
+  const privateReviewError = {
+    code: 'ONBOARDING_ENDPOINT_PRIVATE_REVIEW_REQUIRED', severity: 'error', retryable: false,
+    message: 'The node address resolves to a private network.',
+    nextAction: 'Confirm that this is the intended private destination, then retry.'
+  }
+  const agentUnavailableError = {
+    code: 'AGENT_UNREACHABLE', severity: 'error', retryable: true,
+    message: 'The approved read-only agent is unavailable.',
+    nextAction: 'Check the agent, copy a fresh pairing payload, and retry.'
   }
   const onboardingReview = {
     schemaVersion: 1, contractVersion: '1.0.0', id: 'review-onboarding-node', digest: '${'b'.repeat(64)}',
@@ -45,7 +55,7 @@ function fixtureBridgeSource() {
     access: {
       mode: 'quick', status: 'connected', capabilities: fixtures.partial.inspection.snapshot.capabilities,
       authority: 'public-observe', lastVerifiedAt: '2026-07-14T08:31:00.000Z', freshness: 'fresh',
-      warnings: ['Host components and local governance configuration are unavailable through Quick Connect.']
+      warnings: ['Host components and local governance configuration are unavailable with Basic inspection.']
     },
     inspection: fixtures.partial.inspection.snapshot,
     createdAt: '2026-07-14T08:31:00.000Z', expiresAt: '2026-07-14T08:41:00.000Z',
@@ -56,18 +66,31 @@ function fixtureBridgeSource() {
     list: async () => ({ ok: true, value: structuredClone(visibleDirectory) }),
     inspect: async (nodeId) => {
       inspectionCalls += 1
+      if (scenario === 'initial-error') return { ok: false, error: safeError }
       if (scenario === 'refresh-error' && inspectionCalls > 1) return { ok: false, error: safeError }
+      if (scenario === 'refresh-progress' && inspectionCalls > 1) await new Promise((resolve) => setTimeout(resolve, 2500))
       const value = nodeId === 'mainnet-seed' || scenario === 'partial' ? fixtures.partial : fixtures.complete
-      return { ok: true, value: structuredClone(value) }
+      const response = structuredClone(value)
+      if (inspectionCalls > 1) {
+        response.inspection.snapshot.capturedAt = new Date().toISOString()
+        if (response.inspection.snapshot.chain.head.availability === 'available') response.inspection.snapshot.chain.head.value.height += 12
+      }
+      return { ok: true, value: response }
     }
   })
   const unavailable = async () => ({ ok: false, error: safeError })
   window.knmOnboarding = Object.freeze({
     version: '1.0.0',
-    previewQuick: async () => scenario === 'onboarding-handoff'
-      ? ({ ok: true, value: structuredClone(onboardingReview) })
-      : unavailable(),
-    previewFullFromClipboard: unavailable,
+    previewQuick: async (input) => {
+      if (scenario === 'private-review' && !input.allowPrivate) return { ok: false, error: privateReviewError }
+      return scenario === 'onboarding-handoff' || scenario === 'private-review'
+        ? ({ ok: true, value: structuredClone(onboardingReview) })
+        : unavailable()
+    },
+    previewFullFromClipboard: async (input) => {
+      if (scenario === 'full-private-review' && !input.allowPrivate) return { ok: false, error: privateReviewError }
+      return { ok: false, error: agentUnavailableError }
+    },
     pairFullImported: unavailable, revokeFull: unavailable,
     apply: async (reviewId, digest) => {
       if (scenario !== 'onboarding-handoff' || reviewId !== onboardingReview.id || digest !== onboardingReview.digest) return unavailable()
@@ -122,7 +145,7 @@ function inspection(snapshot, node) {
 }
 
 function completeSnapshot() {
-  const at = '2026-07-14T08:30:00.000Z'
+  const at = new Date(Date.now() - 30_000).toISOString()
   const available = (value, source = 'runtime-status', authority = 'verified') => ({
     availability: 'available', value, evidence: evidence(at, source, authority)
   })
@@ -189,7 +212,7 @@ function completeSnapshot() {
 }
 
 function partialSnapshot() {
-  const at = '2026-07-14T08:31:00.000Z'
+  const at = new Date(Date.now() - 30_000).toISOString()
   const available = (value, source = 'jsonrpc', authority = 'observed') => ({
     availability: 'available', value, evidence: evidence(at, source, authority)
   })
@@ -231,7 +254,7 @@ function partialSnapshot() {
       observedProposalVotes: unavailable('insufficient-evidence'), networkProposals: unavailable('probe-unsupported')
     },
     resources: { storage: unavailable(), cpuPercent: unavailable(), memoryBytes: unavailable() },
-    warnings: [{ code: 'QUICK_CONNECT_LIMITED', severity: 'warning', summary: 'Quick Connect cannot inspect host components, local producer configuration, or locally configured governance proposals.' }],
+    warnings: [{ code: 'QUICK_CONNECT_LIMITED', severity: 'warning', summary: 'Basic inspection cannot inspect host components, local producer configuration, or locally configured governance proposals.' }],
     evidence: [evidence(at, 'jsonrpc', 'observed')]
   }
 }

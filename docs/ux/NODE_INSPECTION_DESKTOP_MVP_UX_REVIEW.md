@@ -1,5 +1,11 @@
 # Node Inspection Desktop MVP UX Review
 
+Status: review complete; the recommended first correction slice was implemented
+and validated on 2026-07-15.
+
+Implementation evidence:
+`docs/validation/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_AUDIT.md`
+
 Status: proposed correction set validated; no production code changed
 
 Review date: 2026-07-14
@@ -332,3 +338,15 @@ outcomes first, make exceptional security review contextual, prioritize useful
 evidence over repeated absence, and make keyboard focus behavior dependable.
 The accompanying correction plan limits the first implementation goal to that
 coherent slice.
+
+## Implementation follow-up
+
+The six-item first slice is now implemented without changing public DTOs,
+transport ownership, persistence, or read-only semantics. Outcome-led access
+labels, contextual private-destination review, compact partial evidence,
+unified inspection status, roving tab behavior, strong focus, and Limited
+section qualifiers passed deterministic, compiled, packaged, responsive, and
+keyboard validation. The remaining UX-08 through UX-10 ideas stay deferred;
+the initial-error recovery part of UX-11 was completed with the unified status
+work. See the correction audit for exact evidence and remaining product
+questions.

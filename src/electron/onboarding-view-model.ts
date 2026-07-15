@@ -11,6 +11,7 @@ export type OnboardingViewState =
   | { status: 'error'; mode: 'quick' | 'full'; category: OnboardingErrorCategory; error: PublicApplicationError }
 
 export type OnboardingErrorCategory =
+  | 'private-review-required'
   | 'agent-unavailable'
   | 'incompatible-protocol'
   | 'pairing-expired'
@@ -43,6 +44,7 @@ export function reduceOnboardingView(state: OnboardingViewState, event: Onboardi
 }
 
 export function errorCategory(code: string): OnboardingErrorCategory {
+  if (code === 'ONBOARDING_ENDPOINT_PRIVATE_REVIEW_REQUIRED') return 'private-review-required'
   if (code === 'AGENT_UNREACHABLE') return 'agent-unavailable'
   if (code === 'AGENT_PROTOCOL_INCOMPATIBLE' || code === 'AGENT_BUILD_UNTRUSTED') return 'incompatible-protocol'
   if (code === 'AGENT_PAIRING_EXPIRED') return 'pairing-expired'

@@ -48,14 +48,20 @@ the repository does not claim those external gates passed. See the
 The Node Inspection Desktop MVP is also implemented. The real Electron
 application starts on a sanitized persisted node directory, opens a read-only
 Node Detail with Overview, Components, Chain, and Governance, and refreshes
-only when the operator selects **Refresh**. Quick and Full onboarding now hand
-off directly to the same stable node. The renderer remains sandboxed and has
+only when the operator selects **Refresh**. Desktop onboarding presents the
+existing Quick and Full contracts as outcome-led **Basic inspection** and
+**Complete inspection** choices, and both hand off directly to the same stable
+node. Partial evidence now prioritizes available chain facts, unavailable
+Components and Governance tabs are labelled **Limited**, and freshness,
+refresh progress, retained stale evidence, and retry are grouped together.
+The renderer remains sandboxed and has
 no network, filesystem, process, SSH, Docker, secret, or CLI-parsing access.
 The deterministic, compiled, Electron development, packaged, accessibility,
-responsive, and visual gates pass. A new private-target desktop run was not
-performed; the underlying adapter retains the separately approved live
-read-only evidence described above. See the
-[desktop MVP audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_AUDIT.md).
+responsive, keyboard, and two-cycle visual gates pass. A new private-target
+desktop run was not performed for the presentation-only correction; the
+underlying adapter retains the separately approved live read-only evidence
+described above. See the [desktop MVP audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_AUDIT.md)
+and [UX correction audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_AUDIT.md).
 
 The existing remote-management MVP was developed inside Koinos One; its
 technical plans and evidence have been moved here as the starting point for a
@@ -76,8 +82,13 @@ npm run desktop
 The application uses the same persisted inventory and functional core as the
 CLI. It opens on **Nodes**. Select a node to run one bounded read-only
 inspection, select **Refresh** to request new evidence, or select **Add node**
-to use Quick or Full onboarding. There is no background polling and inspection
-snapshots are not persisted.
+to choose **Basic inspection** or **Complete inspection**. The desktop labels
+describe the evidence outcome; the underlying CLI and persisted contract names
+remain `quick` and `full`. Private-destination confirmation appears only when
+the privileged endpoint policy requires review. Use Left/Right arrows or
+Home/End within onboarding and detail tablists; each tablist contributes one
+normal Tab stop. There is no background polling and inspection snapshots are
+not persisted.
 
 For a clean isolated local launch without touching the normal inventory:
 
@@ -398,6 +409,9 @@ build time.
 - [Read-only inspection MVP completion audit](docs/validation/CLI_PHASE_4_MULTISERVICE_INSPECTION_MVP_AUDIT.md)
 - [Node Inspection Desktop MVP plan](docs/plans/NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md)
 - [Node Inspection Desktop MVP completion audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_AUDIT.md)
+- [Node Inspection Desktop MVP UX review](docs/ux/NODE_INSPECTION_DESKTOP_MVP_UX_REVIEW.md)
+- [Node Inspection Desktop MVP UX correction plan](docs/plans/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_PLAN.md)
+- [Node Inspection Desktop MVP UX correction audit](docs/validation/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_AUDIT.md)
 - [Archived source plans](docs/archive/README.md)
 - [UI explorations](assets/ui/)
 

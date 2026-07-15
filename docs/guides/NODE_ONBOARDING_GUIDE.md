@@ -7,17 +7,22 @@
 - External status: no signed reference-agent artifact is published by this
   repository
 
+The desktop uses outcome-led labels: **Basic inspection** is the Quick Connect
+contract, and **Complete inspection** is the Full Connect contract. CLI
+commands, structured output, persistence, and access overrides continue to use
+the stable `quick` and `full` identifiers.
+
 This guide adds an existing Koinos runtime to Koinos Node Manager. It does not
 provision a blank host, install a runtime, activate a producer, or change the
 node.
 
 ## Choose A Mode
 
-| Mode | Operator input | Available evidence | Intended use |
+| Desktop label (CLI name) | Operator input | Available evidence | Intended use |
 | --- | --- | --- | --- |
-| Quick Connect | Koinos JSON-RPC endpoint | Chain, head freshness, and supported public P2P/API facts | Simplest first connection |
-| Full Connect | Compatible read-only agent pairing payload | Complete snapshot supported by the runtime | Routine complete inspection without SSH |
-| Expert Connect | Exact SSH config alias | Complete legacy fixed-probe inspection | Existing and advanced deployments |
+| Basic inspection (`quick`) | Koinos node address | Chain, head freshness, and supported public P2P/API facts | Simplest first connection |
+| Complete inspection (`full`) | Compatible read-only agent pairing payload | Complete snapshot supported by the runtime | Routine complete inspection without SSH |
+| Expert Connect (`expert`) | Exact SSH config alias | Complete legacy fixed-probe inspection | Existing and advanced deployments |
 
 Automatic inspection selects a verified Full binding, then Expert, then
 Quick. Use `nodes inspect <node-id> --access quick|full|expert` only when
@@ -132,8 +137,13 @@ npm install
 npm run desktop
 ```
 
-Quick Connect validates the entered endpoint through Electron main. Full
-Connect imports the complete pairing payload from the clipboard through an
+The desktop calls Quick Connect **Basic inspection** and Full Connect
+**Complete inspection**. Basic validates the entered node address through
+Electron main. A public approved address does not show a private-network
+confirmation. If the privileged endpoint policy returns its typed
+review-required error, the desktop reveals an explicit destination
+confirmation and focuses it; the renderer does not classify URLs, DNS, or IP
+addresses. Complete imports the pairing payload from the clipboard through an
 explicit button. Electron main clears the clipboard, keeps the secret only in
 memory until pairing, and returns a sanitized review. The renderer never opens
 a socket, invokes the CLI, accesses SSH or Docker, or receives the agent
@@ -144,6 +154,12 @@ Detail for the same stable node ID. A still-fresh onboarding inspection is
 reused; otherwise Electron main performs one bounded read-only inspection.
 Returning to **Nodes** shows the persisted record. Quick-to-Full upgrade opens
 the same node instead of creating a duplicate.
+
+Onboarding mode tabs and Node Detail section tabs follow desktop keyboard
+conventions: Left/Right arrows wrap, Home/End move to the first/last tab, and
+Tab leaves the tablist after one selected tab stop. Unavailable Components and
+Governance sections remain selectable and are labelled **Limited** so their
+typed reasons can be inspected.
 
 ## Recovery And Diagnostics
 

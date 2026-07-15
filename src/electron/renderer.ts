@@ -1,6 +1,15 @@
 import type { ElectronNodeInspection, ElectronNodeReadBridge, ElectronOnboardingBridge } from './bridge.js'
 import { reduceDetailView, reduceDirectoryView, type DetailViewState, type DirectoryViewState } from './desktop-view-model.js'
 import { reduceOnboardingView, type OnboardingViewState } from './onboarding-view-model.js'
+import {
+  ROVING_TAB_KEYS,
+  accessModeLabel,
+  isBasicInspection,
+  nextRovingTabIndex,
+  relativeCaptureTime,
+  sectionTabLabel,
+  type RovingTabKey
+} from './desktop-presentation.js'
 import type { PublicApplicationError } from '../core/public-error.js'
 import type {
   InspectionAvailabilityReason,
@@ -25,6 +34,9 @@ let detailState: DetailViewState = { status: 'idle' }
 let activeReview: PublicOnboardingReview | undefined
 let activeSection: InspectionSection = 'overview'
 
+const onboardingModes = ['quick', 'full'] as const
+const detailSections = ['overview', 'components', 'chain', 'governance'] as const
+
 const nodesView = element<HTMLElement>('nodes-view')
 const onboardingView = element<HTMLElement>('onboarding-view')
 const detailView = element<HTMLElement>('detail-view')
@@ -35,6 +47,8 @@ const addNodeButton = element<HTMLButtonElement>('add-node')
 const detailStatus = element<HTMLElement>('detail-status')
 const refreshButton = element<HTMLButtonElement>('refresh-node')
 const detailWarnings = element<HTMLElement>('detail-warnings')
+const detailBadges = element<HTMLElement>('detail-badges')
+const detailTabs = element<HTMLElement>('detail-tabs')
 const quickForm = element<HTMLFormElement>('quick-form')
 const fullForm = element<HTMLFormElement>('full-form')
 const status = element<HTMLElement>('status')
@@ -44,6 +58,8 @@ const pairButton = element<HTMLButtonElement>('pair-review')
 const revokeButton = element<HTMLButtonElement>('revoke-review')
 const cancelButton = element<HTMLButtonElement>('cancel-review')
 const installGuidance = element<HTMLElement>('agent-install-guidance')
+const quickPrivateReview = element<HTMLElement>('quick-private-review')
+const fullPrivateReview = element<HTMLElement>('full-private-review')
 
 element<HTMLButtonElement>('home-button').addEventListener('click', () => { void showNodes(true) })
 addNodeButton.addEventListener('click', showOnboarding)
@@ -52,31 +68,14 @@ element<HTMLButtonElement>('back-from-onboarding').addEventListener('click', () 
 element<HTMLButtonElement>('back-to-nodes').addEventListener('click', () => { void showNodes(true) })
 refreshButton.addEventListener('click', () => { void refreshDetail() })
 
-element<HTMLButtonElement>('mode-quick').addEventListener('click', () => selectMode('quick'))
-element<HTMLButtonElement>('mode-full').addEventListener('click', () => selectMode('full'))
-
-for (const section of ['overview', 'components', 'chain', 'governance'] as const) {
-  element<HTMLButtonElement>(`detail-tab-${section}`).addEventListener('click', () => selectDetailSection(section))
-}
-
-element<HTMLElement>('detail-tab-overview').parentElement?.addEventListener('keydown', (event) => {
-  if (!(event instanceof KeyboardEvent) || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
-  event.preventDefault()
-  const sections: readonly InspectionSection[] = ['overview', 'components', 'chain', 'governance']
-  const current = sections.indexOf(activeSection)
-  const next = event.key === 'Home' ? 0 : event.key === 'End' ? sections.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + sections.length) % sections.length
-  const section = sections[next]
-  if (section === undefined) return
-  selectDetailSection(section)
-  element<HTMLButtonElement>(`detail-tab-${section}`).focus()
-})
+installRovingTablist(onboardingModes, (mode) => `mode-${mode}`, selectMode)
+installRovingTablist(detailSections, (section) => `detail-tab-${section}`, selectDetailSection)
 
 quickForm.addEventListener('submit', async (event) => {
   event.preventDefault()
   setOnboardingLoading('Connecting with bounded read-only probes…')
   const endpoint = element<HTMLInputElement>('rpc-endpoint')
   const privateEndpoint = endpoint.value
-  endpoint.value = ''
   const result = await window.knmOnboarding.previewQuick({
     nodeId: element<HTMLInputElement>('node-id').value,
     ...optionalName('display-name'),
@@ -84,6 +83,7 @@ quickForm.addEventListener('submit', async (event) => {
     allowPrivate: element<HTMLInputElement>('allow-private').checked,
     allowLoopbackHttp: false
   })
+  if (result.ok) endpoint.value = ''
   finishOnboardingResult(result)
 })
 
@@ -190,7 +190,7 @@ function nodeRow(node: PublicNodeSummary): HTMLButtonElement {
   const pills = document.createElement('span')
   pills.className = 'access-pills'
   if (node.availableAccessModes.length === 0) pills.append(pill('Unavailable', 'pill-muted'))
-  else for (const mode of node.availableAccessModes) pills.append(pill(titleCase(mode), mode === node.preferredAccessMode ? 'pill-safe' : ''))
+  else for (const mode of node.availableAccessModes) pills.append(pill(accessModeLabel(mode), mode === node.preferredAccessMode ? 'pill-safe' : ''))
   access.append(pills)
   row.append(access)
   row.addEventListener('click', () => { void showDetail(node.nodeId) })
@@ -236,6 +236,10 @@ async function publicSummary(nodeId: string): Promise<PublicNodeSummary | undefi
 
 async function refreshDetail(): Promise<void> {
   if (detailState.status === 'loading' || detailState.status === 'refreshing' || detailState.status === 'idle') return
+  if (detailState.status === 'error' && detailState.previous === undefined) {
+    await showDetail(detailState.nodeId)
+    return
+  }
   const current = detailState.status === 'ready' ? detailState.value : detailState.previous
   if (current === undefined) return
   detailState = reduceDetailView(detailState, { type: 'refresh' })
@@ -251,19 +255,26 @@ function renderDetailState(): void {
   if (detailState.status === 'idle') return
   if (detailState.status === 'loading') {
     refreshButton.disabled = true
+    refreshButton.textContent = 'Refresh'
     text('detail-title', 'Loading node…')
     text('detail-node-id', detailState.nodeId)
-    setStatus(detailStatus, 'Running bounded read-only inspection…', 'progress')
+    detailBadges.hidden = true
+    detailTabs.hidden = true
+    setInspectionTiming('loading', 'Loading inspection', 'Waiting for evidence')
+    setDetailStatus('Running bounded read-only inspection…', 'progress', false)
     clearDetailContent()
     return
   }
   if (detailState.status === 'error' && detailState.previous === undefined) {
     refreshButton.disabled = false
+    refreshButton.textContent = 'Try again'
     text('detail-title', 'Inspection unavailable')
     text('detail-node-id', detailState.nodeId)
-    setStatus(detailStatus, `${detailState.error.message} ${detailState.error.nextAction}`, 'error')
+    detailBadges.hidden = true
+    detailTabs.hidden = true
     clearDetailContent()
-    element('overview-content').append(errorCard(detailState.error))
+    setInspectionTiming('unavailable', 'Inspection unavailable', 'No inspection captured')
+    setDetailStatus(`${detailState.error.message} ${detailState.error.nextAction}`, 'error', true)
     return
   }
   const value = detailState.status === 'ready' || detailState.status === 'refreshing'
@@ -273,34 +284,50 @@ function renderDetailState(): void {
   const failedRefresh = detailState.status === 'error'
   renderDetail(value, failedRefresh)
   refreshButton.disabled = detailState.status === 'refreshing'
-  if (detailState.status === 'refreshing') setStatus(detailStatus, 'Refreshing read-only evidence. The previous snapshot remains visible.', 'progress')
-  else if (detailState.status === 'error') setStatus(detailStatus, `${detailState.error.message} Previous evidence is retained and marked stale. ${detailState.error.nextAction}`, 'error')
-  else if (value.inspection.snapshot.freshness === 'stale') setStatus(detailStatus, 'This inspection completed with stale evidence. Review unavailable facts before relying on it.', 'warning')
-  else setStatus(detailStatus, 'Inspection complete. No node or blockchain state was changed.', 'success')
+  if (detailState.status === 'refreshing') {
+    refreshButton.textContent = 'Refreshing…'
+    setInspectionTiming('loading', 'Refreshing… · Previous capture retained', `Captured ${formatDate(value.inspection.snapshot.capturedAt)}`)
+    setDetailStatus('Refreshing read-only evidence. The previous snapshot remains visible.', 'progress', false)
+  } else if (detailState.status === 'error') {
+    refreshButton.textContent = 'Try again'
+    setDetailStatus(`${detailState.error.message} Previous evidence is retained and marked stale. ${detailState.error.nextAction}`, 'error', true)
+  } else if (value.inspection.snapshot.freshness === 'stale') {
+    refreshButton.textContent = 'Refresh'
+    setDetailStatus('This inspection completed with stale evidence. Review unavailable facts before relying on it.', 'warning', true)
+  } else {
+    refreshButton.textContent = 'Refresh'
+    setDetailStatus('Fresh inspection received.', 'success', false)
+  }
 }
 
 function renderDetail(value: ElectronNodeInspection, forceStale: boolean): void {
   const snapshot = value.inspection.snapshot
+  detailBadges.hidden = false
+  detailTabs.hidden = false
   text('detail-title', value.node.displayName)
   text('detail-node-id', value.node.nodeId)
   text('detail-network', titleCase(value.node.network))
   text('detail-runtime', flavorLabel(value.node.runtimeFlavor))
-  text('detail-access', value.node.preferredAccessMode === null ? 'Access unavailable' : `${titleCase(value.node.preferredAccessMode)} access`)
+  text('detail-access', value.node.preferredAccessMode === null ? 'Access unavailable' : `${accessModeLabel(value.node.preferredAccessMode)} access`)
   const freshness = forceStale ? 'stale' : snapshot.freshness
-  text('detail-freshness', titleCase(freshness))
-  element('detail-freshness').className = `pill ${freshness === 'fresh' ? 'pill-safe' : 'pill-warning'}`
-  text('detail-captured', formatDate(snapshot.capturedAt))
+  setInspectionTiming(
+    freshness,
+    `${titleCase(freshness)} · ${forceStale ? 'Last successful capture' : 'Updated'} ${relativeCaptureTime(snapshot.capturedAt, Date.now())}`,
+    `Captured ${formatDate(snapshot.capturedAt)}`
+  )
   renderWarnings(snapshot)
   renderOverview(snapshot)
   renderComponents(snapshot)
   renderChain(snapshot)
   renderGovernance(snapshot)
+  updateSectionTabs(snapshot)
 }
 
 function renderWarnings(snapshot: PublicNodeInspectionSnapshot): void {
   detailWarnings.replaceChildren()
-  detailWarnings.hidden = snapshot.warnings.length === 0
-  for (const warning of snapshot.warnings) {
+  const warnings = snapshot.warnings.filter((warning) => !(isBasicInspection(snapshot) && warning.code === 'QUICK_CONNECT_LIMITED'))
+  detailWarnings.hidden = warnings.length === 0
+  for (const warning of warnings) {
     const item = document.createElement('div')
     item.className = 'warning-item'
     item.textContent = warning.summary
@@ -320,27 +347,60 @@ function renderOverview(snapshot: PublicNodeInspectionSnapshot): void {
     summaryCard('Peers', snapshot.chain.peerCount, formatNumber)
   )
   container.append(summary)
-  container.append(sectionCard('Runtime', [
+  const runtime = sectionCard('Runtime', [
     fact('Runtime', inspectionText(snapshot.overview.runtime, (value) => `${flavorLabel(value.flavor)}${value.version === undefined ? '' : ` ${value.version}`}`)),
     fact('Build', inspectionText(snapshot.overview.build, artifactLabel)),
     fact('Supervisor', inspectionText(snapshot.overview.supervisor, titleCase)),
     fact('Layout', inspectionText(snapshot.overview.layout, (value) => value === 'legacy-services' ? 'Legacy services' : 'Monolith')),
     fact('Uptime', inspectionText(snapshot.overview.uptimeSeconds, formatDuration)),
     fact('Instance detected', inspectionText(snapshot.overview.instance, (value) => yesNo(value.present)))
-  ]))
-  container.append(sectionCard('Producer and APIs', [
+  ])
+  const producer = sectionCard('Producer', [
     fact('Producer configured', inspectionText(snapshot.producer.configured, yesNo)),
     fact('Producer effective', inspectionText(snapshot.producer.effectiveEnabled, yesNo)),
     fact('Producer identity', inspectionText(snapshot.producer.addressPresent, (value) => value ? 'Present (hidden)' : 'Not present')),
     fact('Recent production', inspectionText(snapshot.producer.recentProduction, (value) => `${formatNumber(value.producedBlocks)} of ${formatNumber(value.observationWindowBlocks)} blocks`)),
-    fact('Production rate', inspectionText(snapshot.producer.productionPercentage, (value) => `${formatNumber(value)}%`)),
-    fact('API exposure', inspectionText(snapshot.apis, apiLabel))
-  ]))
-  container.append(sectionCard('Resources', [
+    fact('Production rate', inspectionText(snapshot.producer.productionPercentage, (value) => `${formatNumber(value)}%`))
+  ])
+  const resources = sectionCard('Resources', [
     fact('Storage', inspectionText(snapshot.resources.storage, (value) => `${formatBytes(value.freeBytes)} free of ${formatBytes(value.totalBytes)}`)),
     fact('CPU', inspectionText(snapshot.resources.cpuPercent, (value) => `${formatNumber(value)}%`)),
     fact('Memory', inspectionText(snapshot.resources.memoryBytes, formatBytes))
-  ]))
+  ])
+  const publicAccess = sectionCard('API exposure', [
+    fact('Available APIs', inspectionText(snapshot.apis, apiLabel))
+  ])
+  publicAccess.classList.add('public-access-card')
+  if (!isBasicInspection(snapshot)) {
+    container.append(runtime, sectionCard('Producer and APIs', [
+      fact('Producer configured', inspectionText(snapshot.producer.configured, yesNo)),
+      fact('Producer effective', inspectionText(snapshot.producer.effectiveEnabled, yesNo)),
+      fact('Producer identity', inspectionText(snapshot.producer.addressPresent, (value) => value ? 'Present (hidden)' : 'Not present')),
+      fact('Recent production', inspectionText(snapshot.producer.recentProduction, (value) => `${formatNumber(value.producedBlocks)} of ${formatNumber(value.observationWindowBlocks)} blocks`)),
+      fact('Production rate', inspectionText(snapshot.producer.productionPercentage, (value) => `${formatNumber(value)}%`)),
+      fact('API exposure', inspectionText(snapshot.apis, apiLabel))
+    ]), resources)
+    return
+  }
+  const limitation = document.createElement('section')
+  limitation.className = 'basic-limitations'
+  const limitationTitle = document.createElement('strong')
+  limitationTitle.textContent = 'Basic inspection limits'
+  const limitationMessage = snapshot.warnings.find((warning) => warning.code === 'QUICK_CONNECT_LIMITED')?.summary
+    ?? 'Runtime components, host resources, producer configuration, and local governance require Complete inspection.'
+  limitation.append(
+    limitationTitle,
+    textSpan('', limitationMessage)
+  )
+  const details = document.createElement('details')
+  details.className = 'overview-details'
+  const detailsSummary = document.createElement('summary')
+  detailsSummary.textContent = 'View unavailable Overview details'
+  const detailsContent = document.createElement('div')
+  detailsContent.className = 'overview-details-content'
+  detailsContent.append(runtime, producer, resources)
+  details.append(detailsSummary, detailsContent)
+  container.append(limitation, publicAccess, details)
 }
 
 function renderComponents(snapshot: PublicNodeInspectionSnapshot): void {
@@ -473,21 +533,12 @@ function unavailableState(title: string, message: string): HTMLElement {
   return state
 }
 
-function errorCard(error: PublicApplicationError): HTMLElement {
-  const card = document.createElement('section')
-  card.className = 'error-card'
-  const heading = document.createElement('h2')
-  heading.textContent = error.message
-  const copy = document.createElement('p')
-  copy.textContent = error.nextAction
-  card.append(heading, copy)
-  return card
-}
-
 function selectDetailSection(section: InspectionSection): void {
   activeSection = section
-  for (const candidate of ['overview', 'components', 'chain', 'governance'] as const) {
-    element(`detail-tab-${candidate}`).setAttribute('aria-selected', String(candidate === section))
+  for (const candidate of detailSections) {
+    const tab = element<HTMLButtonElement>(`detail-tab-${candidate}`)
+    tab.setAttribute('aria-selected', String(candidate === section))
+    tab.tabIndex = candidate === section ? 0 : -1
     element(`detail-panel-${candidate}`).hidden = candidate !== section
   }
 }
@@ -510,19 +561,24 @@ function selectMode(mode: 'quick' | 'full'): void {
   onboardingState = reduceOnboardingView(onboardingState, { type: 'select-mode', mode })
   quickForm.hidden = mode !== 'quick'
   fullForm.hidden = mode !== 'full'
-  element('mode-quick').setAttribute('aria-selected', String(mode === 'quick'))
-  element('mode-full').setAttribute('aria-selected', String(mode === 'full'))
+  for (const candidate of onboardingModes) {
+    const tab = element<HTMLButtonElement>(`mode-${candidate}`)
+    tab.setAttribute('aria-selected', String(mode === candidate))
+    tab.tabIndex = mode === candidate ? 0 : -1
+  }
+  resetPrivateReview()
   reviewPanel.hidden = true
   installGuidance.hidden = true
   setStatus(status, mode === 'quick'
-    ? 'Enter an endpoint to begin. No changes will be made to the node.'
-    : 'Copy a fresh pairing payload from the read-only agent, then import it here.', 'neutral')
+    ? 'Enter a node address to start a read-only inspection.'
+    : 'Copy a fresh pairing payload from an approved read-only agent, then import it here.', 'neutral')
 }
 
 function finishOnboardingResult(result: Awaited<ReturnType<ElectronOnboardingBridge['previewQuick']>>): void {
   quickForm.removeAttribute('aria-busy')
   fullForm.removeAttribute('aria-busy')
   if (!result.ok) return showOnboardingError(result.error)
+  resetPrivateReview()
   activeReview = result.value
   onboardingState = reduceOnboardingView(onboardingState, { type: 'review', review: result.value })
   renderReview(result.value)
@@ -532,7 +588,7 @@ function renderReview(review: PublicOnboardingReview): void {
   reviewPanel.hidden = false
   installGuidance.hidden = true
   text('review-node', `${review.node.displayName} (${review.node.id})`)
-  text('review-mode', review.mode === 'quick' ? 'Quick / limited inspection' : 'Full / paired inspection')
+  text('review-mode', review.mode === 'quick' ? 'Basic inspection' : 'Complete inspection')
   text('review-network', onboardingNetworkLabel(review))
   text('review-capabilities', availableCapabilities(review).join(', ') || 'No capabilities reported')
   text('review-limitations', review.access.warnings.length === 0 ? 'No reported limitations' : review.access.warnings.join(', '))
@@ -540,7 +596,7 @@ function renderReview(review: PublicOnboardingReview): void {
   pairButton.hidden = review.status !== 'pairing'
   applyButton.hidden = review.status !== 'review-ready'
   revokeButton.hidden = review.status !== 'committed' || review.mode !== 'full'
-  applyButton.textContent = review.node.existing ? 'Upgrade existing node' : review.mode === 'quick' ? 'Add limited node' : 'Add node'
+  applyButton.textContent = review.node.existing ? 'Upgrade existing node' : 'Add node'
   cancelButton.hidden = review.status === 'committed'
   setStatus(status, review.status === 'pairing'
     ? 'Agent identity is pinned for this review. Continue to consume the imported single-use secret.'
@@ -562,7 +618,43 @@ function showOnboardingError(error: PublicApplicationError): void {
   fullForm.removeAttribute('aria-busy')
   onboardingState = reduceOnboardingView(onboardingState, { type: 'failed', error })
   setStatus(status, `${error.message} ${error.nextAction}`, 'error')
+  if (error.code === 'ONBOARDING_ENDPOINT_PRIVATE_REVIEW_REQUIRED') {
+    const full = onboardingState.mode === 'full'
+    const review = full ? fullPrivateReview : quickPrivateReview
+    const checkbox = element<HTMLInputElement>(full ? 'full-allow-private' : 'allow-private')
+    review.hidden = false
+    checkbox.focus()
+  }
   installGuidance.hidden = !(onboardingState.status === 'error' && onboardingState.mode === 'full' && onboardingState.category === 'agent-unavailable')
+}
+
+function resetPrivateReview(): void {
+  quickPrivateReview.hidden = true
+  fullPrivateReview.hidden = true
+  element<HTMLInputElement>('allow-private').checked = false
+  element<HTMLInputElement>('full-allow-private').checked = false
+}
+
+function installRovingTablist<T extends string>(
+  values: readonly T[],
+  id: (value: T) => string,
+  select: (value: T) => void
+): void {
+  const buttons = values.map((value) => element<HTMLButtonElement>(id(value)))
+  for (const [index, button] of buttons.entries()) {
+    button.addEventListener('click', () => select(values[index] as T))
+  }
+  buttons[0]?.parentElement?.addEventListener('keydown', (event) => {
+    if (!(event instanceof KeyboardEvent) || !ROVING_TAB_KEYS.includes(event.key as RovingTabKey)) return
+    const current = buttons.findIndex((button) => button === document.activeElement)
+    const next = nextRovingTabIndex(current, event.key as RovingTabKey, buttons.length)
+    const value = values[next]
+    const button = buttons[next]
+    if (value === undefined || button === undefined) return
+    event.preventDefault()
+    select(value)
+    button.focus()
+  })
 }
 
 function onboardingNetworkLabel(review: PublicOnboardingReview): string {
@@ -582,7 +674,31 @@ function clearDetailContent(): void {
   detailWarnings.replaceChildren()
   detailWarnings.hidden = true
   for (const id of ['overview-content', 'components-content', 'chain-content', 'governance-content']) element(id).replaceChildren()
-  for (const id of ['detail-network', 'detail-runtime', 'detail-access', 'detail-freshness', 'detail-captured']) text(id, '—')
+  for (const id of ['detail-network', 'detail-runtime', 'detail-access']) text(id, '—')
+  updateSectionTabs()
+}
+
+function updateSectionTabs(snapshot?: PublicNodeInspectionSnapshot): void {
+  for (const section of detailSections) text(`detail-tab-${section}`, sectionTabLabel(section, snapshot))
+}
+
+function setInspectionTiming(
+  freshness: 'fresh' | 'stale' | 'loading' | 'unavailable',
+  summary: string,
+  captured: string
+): void {
+  text('detail-freshness-summary', summary)
+  element('detail-freshness-summary').dataset.freshness = freshness
+  text('detail-captured', captured)
+}
+
+function setDetailStatus(
+  message: string,
+  kind: 'neutral' | 'progress' | 'success' | 'warning' | 'error',
+  visible: boolean
+): void {
+  setStatus(detailStatus, message, kind)
+  detailStatus.classList.toggle('status-live-only', !visible)
 }
 
 function setStatus(target: HTMLElement, message: string, kind: 'neutral' | 'progress' | 'success' | 'warning' | 'error'): void {

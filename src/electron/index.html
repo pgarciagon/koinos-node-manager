@@ -13,7 +13,7 @@
         <span class="brand-mark" aria-hidden="true">✣</span>
         <span>Koinos Node Manager</span>
       </button>
-      <span class="read-only-global">Read-only MVP</span>
+      <span class="read-only-global">Read only</span>
     </header>
 
     <main class="shell">
@@ -33,7 +33,7 @@
         <section id="nodes-empty" class="empty-state" hidden aria-labelledby="nodes-empty-title">
           <div class="empty-icon" aria-hidden="true">◎</div>
           <h2 id="nodes-empty-title">Add your first node</h2>
-          <p>Start with a public JSON-RPC endpoint or pair a read-only node agent. Node Manager will not change the node.</p>
+          <p>Start with Basic inspection from a node address, or use Complete inspection with an approved read-only agent.</p>
           <button id="add-first-node" type="button">Add your first node</button>
         </section>
       </section>
@@ -41,7 +41,13 @@
       <section id="detail-view" class="view" hidden aria-labelledby="detail-title">
         <div class="view-toolbar">
           <button id="back-to-nodes" class="text-button" type="button">← Back to nodes</button>
-          <button id="refresh-node" type="button">Refresh</button>
+          <div class="inspection-status-group" aria-label="Inspection freshness and refresh">
+            <div class="inspection-timing">
+              <strong id="detail-freshness-summary">Loading inspection</strong>
+              <span id="detail-captured">Waiting for evidence</span>
+            </div>
+            <button id="refresh-node" type="button">Refresh</button>
+          </div>
         </div>
 
         <header class="detail-header">
@@ -50,27 +56,22 @@
             <h1 id="detail-title" tabindex="-1">Node</h1>
             <p id="detail-node-id" class="node-id"></p>
           </div>
-          <div class="detail-badges" aria-label="Node context">
+          <div id="detail-badges" class="detail-badges" aria-label="Node context">
             <span id="detail-read-only" class="pill pill-safe">Read only</span>
             <span id="detail-network" class="pill"></span>
             <span id="detail-runtime" class="pill"></span>
             <span id="detail-access" class="pill"></span>
-            <span id="detail-freshness" class="pill"></span>
           </div>
         </header>
 
-        <div class="capture-line">
-          <span>Captured <strong id="detail-captured">—</strong></span>
-          <span>Refresh runs bounded inspection probes and never changes the node.</span>
-        </div>
         <p id="detail-status" class="status compact-status" role="status" aria-live="polite">Loading inspection…</p>
         <div id="detail-warnings" class="warning-list" hidden></div>
 
-        <div class="detail-tabs" role="tablist" aria-label="Inspection section">
-          <button id="detail-tab-overview" class="detail-tab" type="button" role="tab" aria-selected="true" aria-controls="detail-panel-overview">Overview</button>
-          <button id="detail-tab-components" class="detail-tab" type="button" role="tab" aria-selected="false" aria-controls="detail-panel-components">Components</button>
-          <button id="detail-tab-chain" class="detail-tab" type="button" role="tab" aria-selected="false" aria-controls="detail-panel-chain">Chain</button>
-          <button id="detail-tab-governance" class="detail-tab" type="button" role="tab" aria-selected="false" aria-controls="detail-panel-governance">Governance</button>
+        <div id="detail-tabs" class="detail-tabs" role="tablist" aria-label="Inspection section">
+          <button id="detail-tab-overview" class="detail-tab" type="button" role="tab" tabindex="0" aria-selected="true" aria-controls="detail-panel-overview">Overview</button>
+          <button id="detail-tab-components" class="detail-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="detail-panel-components">Components</button>
+          <button id="detail-tab-chain" class="detail-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="detail-panel-chain">Chain</button>
+          <button id="detail-tab-governance" class="detail-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="detail-panel-governance">Governance</button>
         </div>
 
         <section id="detail-panel-overview" class="detail-panel" role="tabpanel" aria-labelledby="detail-tab-overview">
@@ -92,36 +93,42 @@
         <header class="onboarding-header">
           <p class="eyebrow">Read-only onboarding</p>
           <h1 id="onboarding-title" tabindex="-1">Add an existing node</h1>
-          <p class="intro">Start with limited public inspection or pair a read-only agent for complete runtime evidence. Neither mode changes the node.</p>
+          <p class="intro">Choose how much evidence you need. Both options inspect without changing the node.</p>
         </header>
 
-        <div class="mode-tabs" role="tablist" aria-label="Connection mode">
-          <button id="mode-quick" class="mode-tab" type="button" role="tab" aria-selected="true">Quick Connect<span>No SSH or agent</span></button>
-          <button id="mode-full" class="mode-tab" type="button" role="tab" aria-selected="false">Full Connect<span>Paired read-only agent</span></button>
+        <div class="mode-tabs" role="tablist" aria-label="Inspection access">
+          <button id="mode-quick" class="mode-tab" type="button" role="tab" tabindex="0" aria-selected="true" aria-controls="quick-form">Basic inspection<span>Chain progress from a node address</span></button>
+          <button id="mode-full" class="mode-tab" type="button" role="tab" tabindex="-1" aria-selected="false" aria-controls="full-form">Complete inspection<span>Runtime and governance with an approved agent</span></button>
         </div>
 
-        <form id="quick-form" class="panel">
+        <form id="quick-form" class="panel" role="tabpanel" aria-labelledby="mode-quick">
           <p class="mode-label">Recommended first step</p>
-          <h2>Quick Connect</h2>
-          <p>Chain and public P2P facts are available. Components, host resources, producer, and local governance configuration remain explicitly unavailable.</p>
+          <h2>Basic inspection</h2>
+          <p>See chain progress and public network evidence from the node address. Runtime, components, producer, resources, and local governance remain limited.</p>
           <div class="field-grid">
-            <label>Node ID<input id="node-id" required maxlength="64" pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?" placeholder="mainnet-seed"></label>
+            <label>Stable Node ID<input id="node-id" required maxlength="64" pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?" aria-describedby="node-id-help" placeholder="mainnet-seed"><span id="node-id-help" class="field-help">Local inventory identity; it is never configured on the node.</span></label>
             <label>Display name<input id="display-name" maxlength="120" placeholder="Mainnet Seed"></label>
           </div>
-          <label>JSON-RPC endpoint<input id="rpc-endpoint" type="url" required autocomplete="off" spellcheck="false" placeholder="https://node.example.invalid/rpc"></label>
-          <label class="check"><input id="allow-private" type="checkbox"> I reviewed this private-network destination</label>
+          <label>Node address<input id="rpc-endpoint" type="url" required autocomplete="off" spellcheck="false" placeholder="https://node.example.invalid/rpc"><span class="field-help">Public HTTPS Koinos endpoint used for bounded read-only inspection.</span></label>
+          <div id="quick-private-review" class="private-review" hidden>
+            <label class="check"><input id="allow-private" type="checkbox"> I confirm this private-network destination is the intended node.</label>
+            <p>Private destinations require explicit review before Node Manager connects.</p>
+          </div>
           <button type="submit">Review connection</button>
         </form>
 
-        <form id="full-form" class="panel" hidden>
-          <p class="mode-label">Complete read-only inspection</p>
-          <h2>Full Connect</h2>
-          <p>Copy a fresh pairing payload from the compatible node agent. The application process imports and clears it; the renderer never receives the endpoint, secret, or credential.</p>
+        <form id="full-form" class="panel" role="tabpanel" aria-labelledby="mode-full" hidden>
+          <p class="mode-label">Requires an approved agent</p>
+          <h2>Complete inspection</h2>
+          <p>Add runtime, component, resource, producer, and local governance evidence with a compatible read-only node agent.</p>
           <div class="field-grid">
-            <label>Node ID<input id="full-node-id" required maxlength="64" pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?" placeholder="existing-node"></label>
+            <label>Stable Node ID<input id="full-node-id" required maxlength="64" pattern="[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?" aria-describedby="full-node-id-help" placeholder="existing-node"><span id="full-node-id-help" class="field-help">Use the same ID to upgrade an existing Basic connection.</span></label>
             <label>Display name<input id="full-display-name" maxlength="120" placeholder="Existing Node"></label>
           </div>
-          <label class="check"><input id="full-allow-private" type="checkbox"> I reviewed this private-network destination</label>
+          <div id="full-private-review" class="private-review" hidden>
+            <label class="check"><input id="full-allow-private" type="checkbox"> I confirm the private-network agent is the intended node.</label>
+            <p>Copy a fresh pairing payload after confirming, then retry the import.</p>
+          </div>
           <button type="submit">Import pairing payload</button>
         </form>
 
@@ -131,7 +138,7 @@
           <p>No signed reference-agent artifact is published by this repository yet. Install only a separately approved, signature-verified build, then create a fresh pairing payload. Node Manager will not run a hidden installer.</p>
         </section>
 
-        <p id="status" class="status" role="status" aria-live="polite">Enter an endpoint to begin. No changes will be made to the node.</p>
+        <p id="status" class="status" role="status" aria-live="polite">Enter a node address to start a read-only inspection.</p>
 
         <section id="review-panel" class="panel review" hidden aria-labelledby="review-title">
           <h2 id="review-title">Connection review</h2>

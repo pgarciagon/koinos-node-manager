@@ -1,10 +1,13 @@
 # Node Inspection Desktop MVP UX Correction Plan
 
-Status: ready for a separate implementation goal
+Status: complete (2026-07-15)
 
 Source review: `docs/ux/NODE_INSPECTION_DESKTOP_MVP_UX_REVIEW.md`
 
 Scope: presentation and interaction corrections only
+
+Completion evidence:
+`docs/validation/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_AUDIT.md`
 
 ## Objective
 
@@ -12,9 +15,9 @@ Make the existing read-only desktop journey understandable to a new operator
 without weakening evidence accuracy, security boundaries, keyboard access, or
 the narrow MVP budget.
 
-This plan does not authorize implementation. It describes a focused next goal
-that changes no product ownership, transport, runtime behavior, persistence
-model, public inspection contract, or remote node state.
+The completed implementation goal authorized this focused slice. It changed no
+product ownership, transport, runtime behavior, persistence model, public
+inspection contract, or remote node state.
 
 ## Correction principles
 
@@ -205,7 +208,7 @@ and Quick-to-Full upgrade behavior are explicitly decided.
 
 ## Affected files
 
-Expected production files for the future implementation goal:
+Production files used by the completed implementation goal:
 
 - `src/electron/index.html` — copy, helper text, semantic attributes, and
   status grouping;
@@ -221,7 +224,7 @@ Expected production files for the future implementation goal:
   required to expose a non-secret typed `review required` result; do not move
   policy into the renderer.
 
-Expected tests to extend:
+Tests extended by the completed implementation:
 
 - `tests/electron-onboarding.test.ts`;
 - `tests/electron-desktop-view-model.test.ts`;
@@ -232,7 +235,7 @@ Expected tests to extend:
 - add a focused renderer DOM/accessibility test only if current tests cannot
   exercise roving tabindex, accessible names, focus, and responsive overflow.
 
-The future implementation must not weaken or rewrite existing adapter,
+The implementation did not weaken or rewrite existing adapter,
 sanitization, CLI, compiled, Electron isolation, or packaged tests to obtain a
 green result.
 
@@ -283,7 +286,7 @@ For every screenshot verify:
 - no secret, private endpoint, SSH alias, user, path, producer address, peer
   identity, credential, token, or key appears.
 
-## Test and release gates for the future implementation
+## Test and release gates
 
 Run at minimum:
 
@@ -329,7 +332,7 @@ honest prerequisite, and collapsed technical digest.
 
 ## Completion gate
 
-The future correction implementation is complete only when:
+The correction implementation is complete only when:
 
 - all six first-slice requirements and acceptance criteria pass;
 - a new operator can choose the appropriate access level without architecture
@@ -355,3 +358,14 @@ This correction plan is intentionally small enough for one focused
 implementation goal. It improves comprehension, hierarchy, feedback, and
 keyboard operation; it does not turn the MVP into a dashboard or fleet
 monitoring product.
+
+## Completion record
+
+All six first-slice requirements are implemented. The complete aggregate gate
+passes with 199 tests, the compiled CLI and Electron smoke pass, the packaged
+macOS Electron smoke passes, and `git diff --check` passes. The running
+application was exercised with keyboard-only navigation and sanitized
+deterministic states at 1060x720, 760x560, and 360x640. Two consecutive visual
+review cycles found no unresolved Critical or Major issue. Exact evidence is
+recorded in the linked completion audit; ignored screenshots remain under
+`.artifacts/ux-correction-review/`.

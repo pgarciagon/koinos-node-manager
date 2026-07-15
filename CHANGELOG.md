@@ -134,6 +134,22 @@ All notable changes to Koinos Node Manager will be documented in this file.
 
 ### Changed
 
+- Desktop onboarding now presents the persisted Quick and Full access contracts
+  as outcome-led **Basic inspection** and **Complete inspection** choices while
+  retaining the existing core, CLI, persistence, and inspection semantics.
+- Private-destination confirmation is hidden for approved public destinations
+  and appears only after the privileged endpoint policy returns its typed
+  review-required error; the renderer performs no endpoint classification.
+- Partial Node Detail now prioritizes available chain evidence, summarizes
+  Basic-inspection limitations once, keeps all typed unavailable details
+  reachable, and labels unavailable Components and Governance sections as
+  **Limited**.
+- Freshness, capture time, explicit Refresh, retained stale evidence, and local
+  retry now form one status interaction; initial inspection failure presents a
+  single contextual retry without empty detail tabs.
+- Onboarding and detail tablists now use roving tabindex with arrow, Home, End,
+  and wraparound behavior, plus a high-contrast focus-visible indicator and
+  responsive layouts validated at 1060x720, 760x560, and 360x640.
 - Consolidated local CLI installation, SSH key onboarding, persisted seed-node
   registration, read-only inspection, interactive use, and troubleshooting into
   one operator guide linked from the README.

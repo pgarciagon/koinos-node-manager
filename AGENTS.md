@@ -1,6 +1,6 @@
 # Koinos Node Manager Agent Instructions
 
-Last updated: 2026-07-11
+Last updated: 2026-07-15
 
 This file is concise operational guidance for Codex sessions. Detailed plans,
 architecture decisions, validation reports, benchmarks, and implementation
@@ -73,6 +73,12 @@ must use the localization system and must not create mixed-language source copy.
   `docs/plans/NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_PLAN.md`
 - Node inspection desktop implementation goal:
   `docs/plans/NODE_INSPECTION_DESKTOP_MVP_IMPLEMENTATION_GOAL.md`
+- Node inspection desktop UX review:
+  `docs/ux/NODE_INSPECTION_DESKTOP_MVP_UX_REVIEW.md`
+- Node inspection desktop UX correction plan:
+  `docs/plans/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_PLAN.md`
+- Node inspection desktop UX correction audit:
+  `docs/validation/NODE_INSPECTION_DESKTOP_MVP_UX_CORRECTION_AUDIT.md`
 - Node onboarding operator guide:
   `docs/guides/NODE_ONBOARDING_GUIDE.md`
 - Read-only node-agent protocol:
